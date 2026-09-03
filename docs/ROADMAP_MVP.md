@@ -27,11 +27,12 @@ Objetivo: tornar a base confiável para desenvolvimento do produto.
 - [x] Confirmar proteção de `.env` e credenciais.
 - [x] Documentar diagnóstico e roadmap.
 - [ ] Tornar o repositório remoto privado.
-- [ ] Instalar ou disponibilizar Docker Desktop.
-- [ ] Subir PostgreSQL e Redis.
-- [ ] Executar todas as migrations em banco limpo.
-- [ ] Iniciar aplicação web e worker simultaneamente.
-- [ ] Atualizar dependências vulneráveis sem regressões.
+- [x] Instalar Docker CLI, Compose e runtime Colima/QEMU.
+- [x] Subir PostgreSQL e Redis.
+- [x] Executar todas as migrations em banco limpo.
+- [x] Iniciar aplicação web e worker simultaneamente.
+- [x] Remover alertas críticos por atualização de dependências, sem regressões.
+- [ ] Tratar ou aceitar formalmente os 8 alertas altos bloqueados por dependências upstream.
 - [ ] Adicionar testes integrados com PostgreSQL e Redis.
 - [ ] Criar teste end-to-end mínimo de login e criação de campanha.
 
@@ -145,7 +146,7 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 ## Próxima execução recomendada
 
 1. Tornar o repositório privado antes de iniciar código proprietário.
-2. Disponibilizar Docker e validar banco, Redis, migrations, web e worker.
-3. Corrigir as vulnerabilidades críticas de dependências.
+2. Definir a estratégia para os alertas altos bloqueados por Auth.js e Prisma.
+3. Adicionar testes integrados com PostgreSQL e Redis.
 4. Criar a arquitetura de internacionalização e iniciar o rebranding.
 5. Implementar workspace ativo antes de contatos e cobrança.

@@ -20,11 +20,11 @@ O código é uma boa fundação para o ReplyFlow e não deve ser refeito do zero
 | ESLint | Aprovado |
 | Testes | 184 aprovados em 16 arquivos |
 | Build de produção | Aprovado; 52 rotas/páginas |
-| Docker | Indisponível no ambiente local |
-| PostgreSQL e Redis | Não iniciados, pois o comando `docker` não existe |
-| Migrations | Não executadas contra banco real |
-| Aplicação web e worker | Não iniciados; dependem de PostgreSQL e Redis |
-| Auditoria de pacotes | 23 alertas: 2 baixos, 3 moderados, 15 altos e 3 críticos |
+| Docker | Docker CLI 29 e Compose 5 instalados; runtime Colima/QEMU funcionando |
+| PostgreSQL e Redis | Iniciados e saudáveis via Docker Compose |
+| Migrations | 18 migrations executadas em banco PostgreSQL limpo |
+| Aplicação web e worker | Aplicação, worker e health check validados localmente |
+| Auditoria de pacotes | Após atualização: 8 alertas altos e nenhum crítico |
 
 Os testes existentes são predominantemente unitários e usam mocks para Prisma, Redis, BullMQ e API da Meta. O resultado é positivo para regressões de lógica, mas não comprova o funcionamento integrado da infraestrutura.
 
@@ -89,6 +89,8 @@ O webhook converte eventos válidos em jobs do BullMQ. O worker processa:
 - retentativas por rate limit ou falhas transitórias.
 
 O worker aplica deduplicação, limite por conta do Instagram, contagem por workspace, tratamento de token expirado e registro de falhas. PostgreSQL, Redis e a chave de criptografia precisam ser iguais na aplicação web e no worker.
+
+Durante a validação, o worker originalmente não carregava o arquivo `.env` quando iniciado pelo script documentado. O processo agora importa `dotenv/config`, preservando variáveis fornecidas pelo ambiente em produção e carregando o arquivo local apenas como fallback.
 
 Risco estrutural: `lib/queue/dm-worker.ts` concentra muita lógica de domínio em um único módulo. Antes de adicionar um construtor visual de fluxos, convém separar handlers de comentário, mensagem, postback, follow gate e follow-up.
 
@@ -158,7 +160,9 @@ Lacunas:
 
 ## Riscos de segurança
 
-O `npm ci` encontrou 23 alertas de dependências, incluindo 3 críticos. A triagem deve priorizar Next.js, Auth.js/NextAuth, Nodemailer e dependências transitivas. Nenhum `npm audit fix --force` foi executado, pois isso poderia introduzir mudanças incompatíveis sem revisão.
+O diagnóstico inicial encontrou 23 alertas, incluindo 3 críticos. Next.js, React, Auth.js/NextAuth, Prisma e Nodemailer foram atualizados, e `npm audit fix` foi aplicado sem mudanças incompatíveis. Após as validações, não restam alertas críticos; o audit registra 8 alertas altos.
+
+Os alertas restantes estão concentrados no Nodemailer aceito pelo Auth.js beta e em dependências de configuração/CLI do Prisma. O Auth.js ainda declara compatibilidade apenas com Nodemailer 7 ou 8, enquanto a correção do alerta residual está na versão 9. O Prisma inclui componentes de MySQL que esta aplicação PostgreSQL não utiliza. Não foi usado `npm audit fix --force`, pois a sugestão automática faria downgrades incompatíveis de Auth.js e Prisma.
 
 Outros pontos para validar antes de produção:
 
@@ -198,7 +202,9 @@ Para desenvolvimento local são necessários:
 - conta Resend ou servidor SMTP para login real;
 - aplicativo da Meta e conta profissional do Instagram para validação ponta a ponta.
 
-O `docker-compose.yml` existente é adequado para iniciar PostgreSQL e Redis. Nesta máquina, porém, o comando `docker` não foi encontrado. A instalação ou disponibilização do Docker Desktop é a pendência para concluir migrations, web e worker localmente.
+O `docker-compose.yml` existente foi usado com sucesso para iniciar PostgreSQL 16 e Redis 7. Como a virtualização nativa não está disponível neste ambiente, o Colima usa QEMU sem aceleração. O primeiro boot é lento, mas os serviços e o encaminhamento das portas locais funcionam.
+
+O modo de produção foi validado em `http://localhost:3000`. O modo de desenvolvimento encontrou o limite de watchers do macOS quando iniciado normalmente; `npm run dev:poll` usa polling e foi validado como alternativa estável. A rota `/api/health` confirmou banco, Redis, fila e heartbeat do worker em estado saudável.
 
 ## Conclusão
 

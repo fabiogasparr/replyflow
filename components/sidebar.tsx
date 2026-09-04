@@ -178,6 +178,13 @@ export default function Sidebar({
                 {workspaceError}
               </p>
             )}
+            <Link
+              href="/settings#workspaces"
+              onClick={onClose}
+              className="mt-2 inline-flex text-[11px] font-semibold text-[#f5c451] transition hover:text-white"
+            >
+              Gerenciar espaços →
+            </Link>
           </div>
         </div>
       </aside>

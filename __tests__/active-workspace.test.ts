@@ -27,8 +27,10 @@ vi.mock("@/lib/db/client", () => ({
 }));
 
 import {
+  createWorkspaceForUser,
   getWorkspaceMembership,
   listUserWorkspaces,
+  normalizeWorkspaceName,
   setActiveWorkspaceForUser,
 } from "../lib/workspace";
 
@@ -40,6 +42,7 @@ const workspace = {
   dmsSentThisPeriod: 12,
   createdAt: new Date("2026-08-01"),
   updatedAt: new Date("2026-09-01"),
+  archivedAt: null,
 };
 
 beforeEach(() => {
@@ -114,21 +117,54 @@ describe("active workspace selection", () => {
 
   it("lists only workspaces reached through the user's memberships", async () => {
     mockPrisma.workspaceMember.findMany.mockResolvedValue([
-      { role: "OWNER", workspace: { id: "workspace_1", name: "Aurora" } },
-      { role: "ADMIN", workspace: { id: "workspace_2", name: "Horizonte" } },
+      {
+        role: "OWNER",
+        workspace: { id: "workspace_1", name: "Aurora", archivedAt: null },
+      },
+      {
+        role: "ADMIN",
+        workspace: { id: "workspace_2", name: "Horizonte", archivedAt: null },
+      },
     ]);
 
     await expect(listUserWorkspaces("user_1")).resolves.toEqual([
-      { id: "workspace_1", name: "Aurora", role: "OWNER" },
-      { id: "workspace_2", name: "Horizonte", role: "ADMIN" },
+      { id: "workspace_1", name: "Aurora", role: "OWNER", archived: false },
+      { id: "workspace_2", name: "Horizonte", role: "ADMIN", archived: false },
     ]);
     expect(mockPrisma.workspaceMember.findMany).toHaveBeenCalledWith({
-      where: { userId: "user_1" },
+      where: { userId: "user_1", workspace: { archivedAt: null } },
       orderBy: { createdAt: "asc" },
       select: {
         role: true,
-        workspace: { select: { id: true, name: true } },
+        workspace: { select: { id: true, name: true, archivedAt: true } },
       },
+    });
+  });
+
+  it("normalizes and creates a workspace as the user's active workspace", async () => {
+    const transactionClient = {
+      workspace: { create: vi.fn().mockResolvedValue(workspace) },
+      user: { update: vi.fn().mockResolvedValue({}) },
+    };
+    mockPrisma.$transaction.mockImplementation(
+      async (callback: (client: typeof transactionClient) => unknown) =>
+        callback(transactionClient)
+    );
+
+    expect(normalizeWorkspaceName("  Loja   Aurora  ")).toBe("Loja Aurora");
+    await expect(
+      createWorkspaceForUser("user_1", "  Loja   Aurora  ")
+    ).resolves.toEqual(workspace);
+    expect(transactionClient.workspace.create).toHaveBeenCalledWith({
+      data: {
+        name: "Loja Aurora",
+        ownerId: "user_1",
+        members: { create: { userId: "user_1", role: "OWNER" } },
+      },
+    });
+    expect(transactionClient.user.update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: { activeWorkspaceId: workspace.id },
     });
   });
 });

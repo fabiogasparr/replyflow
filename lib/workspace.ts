@@ -14,7 +14,12 @@ export type UserWorkspaceOption = {
   id: string;
   name: string;
   role: WorkspaceRole;
+  archived: boolean;
 };
+
+export function normalizeWorkspaceName(name: string): string {
+  return name.trim().replace(/\s+/gu, " ");
+}
 
 export async function acceptPendingInvitationsForUser(
   userId: string,
@@ -85,7 +90,7 @@ export async function getWorkspaceMembership(
       include: { workspace: true },
     });
 
-    if (activeMembership) {
+    if (activeMembership && !activeMembership.workspace.archivedAt) {
       return {
         workspace: activeMembership.workspace,
         role: activeMembership.role,
@@ -94,7 +99,7 @@ export async function getWorkspaceMembership(
   }
 
   const fallbackMembership = await prisma.workspaceMember.findFirst({
-    where: { userId },
+    where: { userId, workspace: { archivedAt: null } },
     include: { workspace: true },
     orderBy: { createdAt: "asc" },
   });
@@ -115,15 +120,19 @@ export async function getWorkspaceMembership(
 }
 
 export async function listUserWorkspaces(
-  userId: string
+  userId: string,
+  options: { includeArchived?: boolean } = {}
 ): Promise<UserWorkspaceOption[]> {
   const memberships = await prisma.workspaceMember.findMany({
-    where: { userId },
+    where: {
+      userId,
+      ...(options.includeArchived ? {} : { workspace: { archivedAt: null } }),
+    },
     orderBy: { createdAt: "asc" },
     select: {
       role: true,
       workspace: {
-        select: { id: true, name: true },
+        select: { id: true, name: true, archivedAt: true },
       },
     },
   });
@@ -132,7 +141,37 @@ export async function listUserWorkspaces(
     id: membership.workspace.id,
     name: membership.workspace.name,
     role: membership.role,
+    archived: Boolean(membership.workspace.archivedAt),
   }));
+}
+
+export async function createWorkspaceForUser(
+  userId: string,
+  name: string
+): Promise<Workspace> {
+  const normalizedName = normalizeWorkspaceName(name);
+
+  return prisma.$transaction(async (transaction) => {
+    const workspace = await transaction.workspace.create({
+      data: {
+        name: normalizedName,
+        ownerId: userId,
+        members: {
+          create: {
+            userId,
+            role: "OWNER",
+          },
+        },
+      },
+    });
+
+    await transaction.user.update({
+      where: { id: userId },
+      data: { activeWorkspaceId: workspace.id },
+    });
+
+    return workspace;
+  });
 }
 
 export async function setActiveWorkspaceForUser(
@@ -146,7 +185,7 @@ export async function setActiveWorkspaceForUser(
     include: { workspace: true },
   });
 
-  if (!membership) return null;
+  if (!membership || membership.workspace.archivedAt) return null;
 
   await prisma.user.update({
     where: { id: userId },
@@ -174,25 +213,7 @@ export async function ensureWorkspaceForUser(
     ? `Espaço de ${email.split("@")[0]}`
     : "Meu espaço de trabalho";
 
-  const workspace = await prisma.workspace.create({
-    data: {
-      name: workspaceName,
-      ownerId: userId,
-      members: {
-        create: {
-          userId,
-          role: "OWNER",
-        },
-      },
-    },
-  });
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { activeWorkspaceId: workspace.id },
-  });
-
-  return workspace;
+  return createWorkspaceForUser(userId, workspaceName);
 }
 
 export async function getActiveWorkspace(

@@ -66,7 +66,7 @@ Progresso validado em 4 de setembro de 2026:
 Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 
 - [x] Implementar seletor e workspace ativo persistente.
-- [ ] Permitir criação, edição e arquivamento de workspaces.
+- [x] Permitir criação, edição, arquivamento e restauração de workspaces.
 - [ ] Revisar papéis `OWNER`, `ADMIN` e `MEMBER`.
 - [ ] Criar permissões granulares para campanhas, inbox, relatórios e cobrança.
 - [ ] Melhorar convites, expiração, reenvio e revogação.
@@ -82,6 +82,8 @@ Progresso validado em 4 de setembro de 2026:
 - Seleções antigas são reparadas automaticamente quando o acesso do usuário é removido.
 - Painel e APIs passam a resolver o mesmo workspace ativo; a troca remonta o painel para descartar estado do cliente anterior.
 - Migração aplicada em PostgreSQL real e contratos protegidos por testes de unidade e de rota.
+- Criação, renomeação, arquivamento e restauração validados pela API contra o banco real.
+- Arquivar preserva os dados e pausa automações ativas; restaurar não reativa campanhas sem revisão do usuário.
 
 ## Marco 3 — Automação MVP
 

@@ -14,6 +14,7 @@ vi.mock("@/lib/auth", () => ({ getCurrentUserId }));
 vi.mock("@/lib/db/client", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/workspace-access", () => ({
   canManageWorkspace: (role: string) => role === "OWNER" || role === "ADMIN",
+  canArchiveWorkspace: (role: string) => role === "OWNER",
 }));
 
 import { PATCH } from "@/app/api/workspaces/[id]/route";

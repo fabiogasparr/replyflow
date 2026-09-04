@@ -7,7 +7,7 @@ import { buildTrackedUrl } from "@/lib/tracking/message";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import { buildReportUrl, generateReportShareSlug } from "@/lib/reports/share";
 import {
-  canManageWorkspace,
+  canManageAutomations,
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
 
@@ -284,9 +284,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!canManageWorkspace(context.role)) {
+  if (!canManageAutomations(context.role)) {
     return NextResponse.json(
-      { success: false, error: "Only owners and admins can create campaigns" },
+      { success: false, error: "Seu perfil não pode criar automações" },
       { status: 403 }
     );
   }
@@ -454,9 +454,9 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  if (!canManageWorkspace(context.role)) {
+  if (!canManageAutomations(context.role)) {
     return NextResponse.json(
-      { success: false, error: "Only owners and admins can update campaigns" },
+      { success: false, error: "Seu perfil não pode alterar automações" },
       { status: 403 }
     );
   }
@@ -616,9 +616,9 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  if (!canManageWorkspace(context.role)) {
+  if (!canManageAutomations(context.role)) {
     return NextResponse.json(
-      { success: false, error: "Only owners and admins can delete campaigns" },
+      { success: false, error: "Seu perfil não pode excluir automações" },
       { status: 403 }
     );
   }

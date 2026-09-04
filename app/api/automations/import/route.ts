@@ -5,7 +5,7 @@ import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
 import { generateReportShareSlug } from "@/lib/reports/share";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import {
-  canManageWorkspace,
+  canManageAutomations,
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
 
@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     );
   }
-  if (!canManageWorkspace(context.role)) {
+  if (!canManageAutomations(context.role)) {
     return NextResponse.json(
-      { success: false, error: "Only owners and admins can import campaigns" },
+      { success: false, error: "Seu perfil não pode importar automações" },
       { status: 403 }
     );
   }

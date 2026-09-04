@@ -67,8 +67,8 @@ Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 
 - [x] Implementar seletor e workspace ativo persistente.
 - [x] Permitir criação, edição, arquivamento e restauração de workspaces.
-- [ ] Revisar papéis `OWNER`, `ADMIN` e `MEMBER`.
-- [ ] Criar permissões granulares para campanhas, inbox, relatórios e cobrança.
+- [x] Revisar papéis `OWNER`, `ADMIN` e `MEMBER`.
+- [x] Criar matriz de permissões para automações, inbox, relatórios, integrações, equipe e cobrança.
 - [ ] Melhorar convites, expiração, reenvio e revogação.
 - [ ] Adicionar trilha de auditoria administrativa.
 - [ ] Revisar todas as queries para isolamento por workspace.
@@ -84,6 +84,8 @@ Progresso validado em 4 de setembro de 2026:
 - Migração aplicada em PostgreSQL real e contratos protegidos por testes de unidade e de rota.
 - Criação, renomeação, arquivamento e restauração validados pela API contra o banco real.
 - Arquivar preserva os dados e pausa automações ativas; restaurar não reativa campanhas sem revisão do usuário.
+- Proprietários controlam cobrança, arquivamento e administradores; administradores operam integrações, automações e membros comuns.
+- Membros não recebem tokens de convites pendentes e convites repetidos nunca alteram o papel do proprietário.
 
 ## Marco 3 — Automação MVP
 

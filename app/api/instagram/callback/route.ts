@@ -9,7 +9,7 @@ import {
   exchangeCodeForToken,
   verifyOAuthState,
 } from "@/lib/meta/oauth";
-import { canManageWorkspace } from "@/lib/workspace-access";
+import { canManageInstagram } from "@/lib/workspace-access";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  if (!membership || !canManageWorkspace(membership.role)) {
+  if (!membership || !canManageInstagram(membership.role)) {
     return NextResponse.redirect(`${baseUrl}/settings?instagram=forbidden`);
   }
 

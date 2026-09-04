@@ -3,33 +3,14 @@ import { getCurrentUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { ensureWorkspaceForUser, getWorkspaceMembership } from "@/lib/workspace";
 
+export * from "@/lib/workspace-permissions";
+
 export type WorkspaceContext = {
   userId: string;
   workspaceId: string;
   workspace: Workspace;
   role: WorkspaceRole;
 };
-
-const ROLE_ORDER: Record<WorkspaceRole, number> = {
-  MEMBER: 1,
-  ADMIN: 2,
-  OWNER: 3,
-};
-
-export function hasWorkspaceRole(
-  role: WorkspaceRole,
-  minimumRole: WorkspaceRole
-) {
-  return ROLE_ORDER[role] >= ROLE_ORDER[minimumRole];
-}
-
-export function canManageWorkspace(role: WorkspaceRole) {
-  return hasWorkspaceRole(role, "ADMIN");
-}
-
-export function canManageBilling(role: WorkspaceRole) {
-  return role === "OWNER";
-}
 
 export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | null> {
   const userId = await getCurrentUserId();

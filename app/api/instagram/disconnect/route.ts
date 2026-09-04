@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import {
-  canManageWorkspace,
+  canManageInstagram,
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
 
@@ -14,9 +14,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!canManageWorkspace(context.role)) {
+  if (!canManageInstagram(context.role)) {
     return NextResponse.json(
-      { success: false, error: "Only owners and admins can disconnect accounts" },
+      { success: false, error: "Seu perfil não pode desconectar contas" },
       { status: 403 }
     );
   }

@@ -26,6 +26,7 @@ interface SettingsData {
 }
 
 interface WorkspaceMembersData {
+  currentUserId: string;
   currentUserRole: "OWNER" | "ADMIN" | "MEMBER";
   members: Array<{
     id: string;
@@ -76,7 +77,7 @@ export default function SettingsPage() {
   }
 
   async function disconnectInstagram(instagramAccountId: string) {
-    if (!confirm("Disconnect Instagram? Campaigns for this account will stop sending DMs.")) {
+    if (!confirm("Desconectar o Instagram? As automações desta conta deixarão de enviar mensagens.")) {
       return;
     }
 
@@ -103,7 +104,7 @@ export default function SettingsPage() {
       setMembersData(payload.data);
       setInviteEmail("");
     } else {
-      setMemberError(payload.error ?? "Could not invite member");
+      setMemberError(payload.error ?? "Não foi possível convidar o integrante");
     }
     setBusy(null);
   }
@@ -116,6 +117,45 @@ export default function SettingsPage() {
       body: JSON.stringify({ invitationId }),
     });
     await refreshMembers();
+    setBusy(null);
+  }
+
+  async function updateMemberRole(
+    memberId: string,
+    role: "ADMIN" | "MEMBER"
+  ) {
+    setMemberError(null);
+    setBusy(`member:${memberId}`);
+    const res = await fetch("/api/workspace/members", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId, role }),
+    });
+    const payload = await res.json();
+    if (payload.success) {
+      setMembersData(payload.data);
+    } else {
+      setMemberError(payload.error ?? "Não foi possível alterar a função");
+    }
+    setBusy(null);
+  }
+
+  async function removeMember(memberId: string, memberName: string) {
+    if (!confirm(`Remover ${memberName} deste espaço de trabalho?`)) return;
+
+    setMemberError(null);
+    setBusy(`member:${memberId}`);
+    const res = await fetch("/api/workspace/members", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId }),
+    });
+    const payload = await res.json();
+    if (payload.success) {
+      setMembersData(payload.data);
+    } else {
+      setMemberError(payload.error ?? "Não foi possível remover o integrante");
+    }
     setBusy(null);
   }
 
@@ -138,14 +178,14 @@ export default function SettingsPage() {
       </Suspense>
 
       <section className="panel rounded p-4 sm:p-6">
-        <h2 className="text-base font-semibold mb-6">Instagram Connection</h2>
+        <h2 className="mb-6 text-base font-semibold">Conexão com o Instagram</h2>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3 py-3 border-b border-border">
             <div>
               <p className="text-sm font-medium text-foreground">Status</p>
               <p className="text-xs text-muted mt-0.5">
-                Comment webhooks and private replies depend on this connection.
+                Comentários e respostas privadas dependem desta conexão.
               </p>
             </div>
             <span
@@ -155,27 +195,26 @@ export default function SettingsPage() {
                   : "bg-warning/10 text-warning"
               }`}
             >
-              {accounts.length > 0 ? "Connected" : "Not connected"}
+              {accounts.length > 0 ? "Conectado" : "Não conectado"}
             </span>
           </div>
 
           <div className="flex items-center justify-between gap-3 py-3 border-b border-border">
             <div>
-              <p className="text-sm font-medium text-foreground">Accounts</p>
+              <p className="text-sm font-medium text-foreground">Contas</p>
               <p className="text-xs text-muted mt-0.5">
-                {accounts.length} connected Instagram profile
-                {accounts.length === 1 ? "" : "s"}
+                {accounts.length} {accounts.length === 1 ? "perfil conectado" : "perfis conectados"}
               </p>
             </div>
             <span className="text-sm text-muted">
-              {accounts.length > 0 ? `${accounts.length} connected` : "None"}
+              {accounts.length > 0 ? `${accounts.length} conectada${accounts.length === 1 ? "" : "s"}` : "Nenhuma"}
             </span>
           </div>
 
           <div className="space-y-3 py-3">
             {accounts.length === 0 && (
               <p className="text-sm text-muted">
-                Connect an Instagram professional account to launch campaigns.
+                Conecte uma conta profissional do Instagram para criar automações.
               </p>
             )}
             {accounts.map((account) => (
@@ -188,11 +227,11 @@ export default function SettingsPage() {
                     @{account.username}
                   </p>
                   <p className="mt-1 text-xs text-muted">
-                    Token expires{" "}
+                    Token expira em{" "}
                     {account.tokenExpiresAt
-                      ? new Date(account.tokenExpiresAt).toLocaleDateString()
-                      : "not available"}{" "}
-                    · {account.webhookSubscribed ? "Webhook ready" : "Webhook pending"}
+                      ? new Date(account.tokenExpiresAt).toLocaleDateString("pt-BR")
+                      : "data indisponível"}{" "}
+                    · {account.webhookSubscribed ? "Webhook ativo" : "Webhook pendente"}
                   </p>
                 </div>
                 <button
@@ -201,8 +240,8 @@ export default function SettingsPage() {
                   className="inline-flex items-center justify-center rounded border border-error/20 px-4 py-2 text-sm font-medium text-error transition-all hover:border-error/40 hover:bg-error/10 disabled:opacity-50"
                 >
                   {busy === `disconnect:${account.id}`
-                    ? "Disconnecting..."
-                    : "Disconnect"}
+                    ? "Desconectando..."
+                    : "Desconectar"}
                 </button>
               </div>
             ))}
@@ -214,7 +253,7 @@ export default function SettingsPage() {
             href="/api/instagram/connect"
             className="px-4 py-2 rounded text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
           >
-            {accounts.length > 0 ? "Connect another account" : "Connect Instagram"}
+            {accounts.length > 0 ? "Conectar outra conta" : "Conectar Instagram"}
           </a>
         </div>
       </section>
@@ -222,30 +261,78 @@ export default function SettingsPage() {
       <WorkspaceManager />
 
       <section className="panel rounded p-4 sm:p-6">
-        <h2 className="text-base font-semibold mb-6">Team</h2>
+        <h2 className="mb-1 text-base font-semibold">Equipe</h2>
+        <p className="mb-6 text-xs leading-5 text-muted">
+          Proprietários controlam tudo; administradores operam contas e automações;
+          membros acompanham resultados e respondem conversas.
+        </p>
         <div className="space-y-3">
-          {membersData?.members.map((member) => (
-            <div
-              key={member.id}
-              className="flex items-center justify-between gap-4 border-b border-border py-3 last:border-0"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {member.user.name ?? member.user.email ?? "Unknown member"}
-                </p>
-                <p className="text-xs text-muted">{member.user.email}</p>
+          {membersData?.members.map((member) => {
+            const memberName =
+              member.user.name ?? member.user.email ?? "Integrante sem nome";
+            const canManageTarget =
+              member.user.id !== membersData.currentUserId &&
+              member.role !== "OWNER" &&
+              (membersData.currentUserRole === "OWNER" || member.role === "MEMBER");
+
+            return (
+              <div
+                key={member.id}
+                className="flex flex-col gap-3 border-b border-border py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {memberName}
+                    {member.user.id === membersData.currentUserId ? " (você)" : ""}
+                  </p>
+                  <p className="text-xs text-muted">{member.user.email}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {membersData.currentUserRole === "OWNER" && canManageTarget ? (
+                    <select
+                      value={member.role}
+                      onChange={(event) =>
+                        void updateMemberRole(
+                          member.id,
+                          event.target.value as "ADMIN" | "MEMBER"
+                        )
+                      }
+                      disabled={busy === `member:${member.id}`}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-muted outline-none focus:border-accent"
+                      aria-label={`Função de ${memberName}`}
+                    >
+                      <option value="MEMBER">Membro</option>
+                      <option value="ADMIN">Administrador</option>
+                    </select>
+                  ) : (
+                    <span className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted">
+                      {member.role === "OWNER"
+                        ? "Proprietário"
+                        : member.role === "ADMIN"
+                          ? "Administrador"
+                          : "Membro"}
+                    </span>
+                  )}
+                  {canManageTarget && (
+                    <button
+                      type="button"
+                      onClick={() => void removeMember(member.id, memberName)}
+                      disabled={busy === `member:${member.id}`}
+                      className="rounded-lg border border-error/20 px-3 py-1.5 text-xs font-semibold text-error transition hover:bg-error/10 disabled:opacity-50"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted">
-                {member.role}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {membersData?.invitations.length ? (
           <div className="mt-6 border-t border-border pt-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Pending invites
+              Convites pendentes
             </p>
             <div className="space-y-3">
               {membersData.invitations.map((invitation) => (
@@ -258,7 +345,8 @@ export default function SettingsPage() {
                       {invitation.email}
                     </p>
                     <p className="truncate text-xs text-muted">
-                      {invitation.role} · {invitation.inviteUrl}
+                      {invitation.role === "ADMIN" ? "Administrador" : "Membro"} ·{" "}
+                      {invitation.inviteUrl}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -269,7 +357,7 @@ export default function SettingsPage() {
                       }
                       className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-border-hover hover:text-foreground"
                     >
-                      Copy
+                      Copiar
                     </button>
                     <button
                       type="button"
@@ -277,7 +365,7 @@ export default function SettingsPage() {
                       disabled={busy === `invite:${invitation.id}`}
                       className="rounded-lg border border-error/20 px-3 py-1.5 text-xs font-medium text-error transition-colors hover:bg-error/10 disabled:opacity-50"
                     >
-                      Revoke
+                      Revogar
                     </button>
                   </div>
                 </div>
@@ -295,7 +383,7 @@ export default function SettingsPage() {
               type="email"
               value={inviteEmail}
               onChange={(event) => setInviteEmail(event.target.value)}
-              placeholder="teammate@agency.com"
+              placeholder="pessoa@empresa.com.br"
               className="rounded border border-border bg-surface px-4 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent/40"
               required
             />
@@ -306,15 +394,17 @@ export default function SettingsPage() {
               }
               className="rounded border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent/40"
             >
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
+              <option value="MEMBER">Membro</option>
+              {membersData.currentUserRole === "OWNER" && (
+                <option value="ADMIN">Administrador</option>
+              )}
             </select>
             <button
               type="submit"
               disabled={busy === "invite"}
               className="rounded bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
-              {busy === "invite" ? "Inviting..." : "Invite"}
+              {busy === "invite" ? "Convidando..." : "Convidar"}
             </button>
             {memberError && (
               <p className="sm:col-span-3 text-sm text-error">{memberError}</p>
@@ -324,14 +414,14 @@ export default function SettingsPage() {
       </section>
 
       <section className="panel rounded p-4 sm:p-6">
-        <h2 className="text-base font-semibold mb-6">Usage</h2>
+        <h2 className="mb-6 text-base font-semibold">Uso</h2>
         <div className="flex items-center justify-between gap-3 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">
-              DMs sent this month
+              Mensagens enviadas neste mês
             </p>
             <p className="text-xs text-muted mt-0.5">
-              Self-hosted — no plan limits.
+              Medição atual do espaço de trabalho.
             </p>
           </div>
           <span className="text-sm font-semibold text-foreground">

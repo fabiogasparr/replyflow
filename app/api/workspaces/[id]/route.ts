@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { canManageWorkspace } from "@/lib/workspace-access";
+import {
+  canArchiveWorkspace,
+  canManageWorkspace,
+} from "@/lib/workspace-access";
 import { normalizeWorkspaceName } from "@/lib/workspace";
 
 const updateWorkspaceSchema = z
@@ -60,7 +63,10 @@ export async function PATCH(
     );
   }
 
-  if (parsed.data.archived !== undefined && membership.role !== "OWNER") {
+  if (
+    parsed.data.archived !== undefined &&
+    !canArchiveWorkspace(membership.role)
+  ) {
     return NextResponse.json(
       {
         success: false,

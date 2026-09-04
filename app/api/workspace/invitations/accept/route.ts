@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { normalizeInvitationEmail } from "@/lib/workspace-invitations";
+import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -72,6 +73,16 @@ export async function POST(request: NextRequest) {
     prisma.user.update({
       where: { id: session.user.id },
       data: { activeWorkspaceId: invitation.workspaceId },
+    }),
+    prisma.auditEvent.create({
+      data: createAuditEventData({
+        workspaceId: invitation.workspaceId,
+        actorUserId: session.user.id,
+        action: AUDIT_ACTIONS.invitationAccepted,
+        targetType: "WorkspaceInvitation",
+        targetId: invitation.id,
+        metadata: { role: invitation.role },
+      }),
     }),
   ]);
 

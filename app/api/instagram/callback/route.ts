@@ -10,6 +10,7 @@ import {
   verifyOAuthState,
 } from "@/lib/meta/oauth";
 import { canManageInstagram } from "@/lib/workspace-access";
+import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -83,25 +84,40 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await prisma.instagramAccount.upsert({
-      where: { instagramId },
-      create: {
-        workspaceId: state.workspaceId,
-        instagramId,
-        username: userInfo.username,
-        name: userInfo.name,
-        accessToken: encryptedToken,
-        tokenExpiresAt,
-        webhookSubscribed,
-      },
-      update: {
-        workspaceId: state.workspaceId,
-        username: userInfo.username,
-        name: userInfo.name,
-        accessToken: encryptedToken,
-        tokenExpiresAt,
-        webhookSubscribed,
-      },
+    await prisma.$transaction(async (transaction) => {
+      const account = await transaction.instagramAccount.upsert({
+        where: { instagramId },
+        create: {
+          workspaceId: state.workspaceId,
+          instagramId,
+          username: userInfo.username,
+          name: userInfo.name,
+          accessToken: encryptedToken,
+          tokenExpiresAt,
+          webhookSubscribed,
+        },
+        update: {
+          workspaceId: state.workspaceId,
+          username: userInfo.username,
+          name: userInfo.name,
+          accessToken: encryptedToken,
+          tokenExpiresAt,
+          webhookSubscribed,
+        },
+      });
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId: state.workspaceId,
+          actorUserId: session.user.id,
+          action: AUDIT_ACTIONS.instagramConnected,
+          targetType: "InstagramAccount",
+          targetId: account.id,
+          metadata: {
+            username: account.username,
+            webhookSubscribed: account.webhookSubscribed,
+          },
+        }),
+      });
     });
 
     return NextResponse.redirect(`${baseUrl}/dashboard?connected=true`);

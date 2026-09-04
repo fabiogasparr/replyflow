@@ -25,6 +25,7 @@ model User {
   activeWorkspace  Workspace?            @relation("UserActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
   workspaceMembers WorkspaceMember[]
   sentInvitations  WorkspaceInvitation[] @relation("WorkspaceInvitationsSent")
+  auditEvents      AuditEvent[]          @relation("AuditActor")
 
   @@index([activeWorkspaceId])
 }
@@ -90,6 +91,7 @@ model Workspace {
   linkClicks        LinkClick[]
   webhookEvents     WebhookEvent[]
   operationalEvents OperationalEvent[]
+  auditEvents       AuditEvent[]
 
   @@index([ownerId])
   @@index([archivedAt])
@@ -350,6 +352,24 @@ model OperationalEvent {
   @@index([source])
   @@index([level])
   @@index([createdAt])
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  workspaceId String
+  actorUserId String?
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([actorUserId])
+  @@index([action])
 }
 
 enum WorkspaceRole {

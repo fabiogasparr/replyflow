@@ -14,10 +14,15 @@ const { getCurrentWorkspaceContext, mockPrisma } = vi.hoisted(() => ({
     },
     workspaceInvitation: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
       upsert: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn(),
     },
     user: { findUnique: vi.fn() },
+    auditEvent: { create: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -55,6 +60,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.workspaceMember.findMany.mockResolvedValue([]);
   mockPrisma.workspaceInvitation.findMany.mockResolvedValue([]);
+  mockPrisma.workspaceInvitation.findUnique.mockResolvedValue(null);
+  mockPrisma.auditEvent.create.mockResolvedValue({});
+  mockPrisma.$transaction.mockImplementation(
+    async (callback: (client: typeof mockPrisma) => unknown) =>
+      callback(mockPrisma)
+  );
 });
 
 describe("workspace member authorization", () => {
@@ -121,7 +132,9 @@ describe("workspace member authorization", () => {
   it("renews a pending invitation with a fresh token and expiry", async () => {
     getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
     mockPrisma.user.findUnique.mockResolvedValue(null);
-    mockPrisma.workspaceInvitation.upsert.mockResolvedValue({});
+    mockPrisma.workspaceInvitation.upsert.mockResolvedValue({
+      id: "invitation_1",
+    });
     mockPrisma.workspaceInvitation.updateMany.mockResolvedValue({ count: 0 });
 
     const response = await POST(
@@ -183,6 +196,12 @@ describe("workspace member authorization", () => {
     expect(mockPrisma.workspaceMember.update).toHaveBeenCalledWith({
       where: { id: "member_admin" },
       data: { role: "MEMBER" },
+    });
+    expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "MEMBER_ROLE_CHANGED",
+        targetId: "user_other",
+      }),
     });
   });
 });

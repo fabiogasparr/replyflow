@@ -70,7 +70,7 @@ Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 - [x] Revisar papéis `OWNER`, `ADMIN` e `MEMBER`.
 - [x] Criar matriz de permissões para automações, inbox, relatórios, integrações, equipe e cobrança.
 - [x] Melhorar convites, expiração, renovação e revogação.
-- [ ] Adicionar trilha de auditoria administrativa.
+- [x] Adicionar trilha de auditoria administrativa.
 - [ ] Revisar todas as queries para isolamento por workspace.
 - [ ] Definir limites de contas do Instagram e membros por plano.
 
@@ -87,6 +87,8 @@ Progresso validado em 4 de setembro de 2026:
 - Proprietários controlam cobrança, arquivamento e administradores; administradores operam integrações, automações e membros comuns.
 - Membros não recebem tokens de convites pendentes e convites repetidos nunca alteram o papel do proprietário.
 - Convites vencidos são expirados automaticamente; gestores podem copiar, renovar ou revogar links com retorno explícito na interface.
+- A trilha de auditoria registra ações administrativas de workspace, equipe, convites e conexões do Instagram, sempre isoladas pelo workspace ativo.
+- Somente proprietários e administradores consultam os 50 eventos mais recentes; tokens e conteúdo de conversas não são armazenados nos eventos.
 
 ## Marco 3 — Automação MVP
 
@@ -166,7 +168,7 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 ## Próxima execução recomendada
 
 1. Tornar o repositório privado antes de iniciar código proprietário.
-2. Definir a estratégia para os alertas altos bloqueados por Auth.js e Prisma.
-3. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
-4. Adicionar testes integrados com PostgreSQL e Redis.
-5. Implementar workspace ativo antes de contatos e cobrança.
+2. Revisar sistematicamente todas as queries para garantir isolamento por workspace.
+3. Definir limites de contas do Instagram e integrantes por plano.
+4. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
+5. Evoluir contatos e inbox sobre a base multiempresa já validada.

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import type { AccountOption } from "@/components/account-select";
 import { InstagramConnectNotice } from "@/components/instagram-connect-notice";
 import WorkspaceManager from "@/components/workspace-manager";
+import WorkspaceAuditLog from "@/components/workspace-audit-log";
 
 interface SettingsData {
   workspace: {
@@ -450,6 +451,8 @@ export default function SettingsPage() {
           </form>
         )}
       </section>
+
+      <WorkspaceAuditLog />
 
       <section className="panel rounded p-4 sm:p-6">
         <h2 className="mb-6 text-base font-semibold">Uso</h2>

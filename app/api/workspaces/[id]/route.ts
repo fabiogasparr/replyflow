@@ -7,6 +7,7 @@ import {
   canManageWorkspace,
 } from "@/lib/workspace-access";
 import { normalizeWorkspaceName } from "@/lib/workspace";
+import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 
 const updateWorkspaceSchema = z
   .object({
@@ -84,24 +85,54 @@ export async function PATCH(
     updateData.archivedAt = parsed.data.archived ? new Date() : null;
   }
 
-  let workspace;
-  if (parsed.data.archived === true) {
-    [workspace] = await prisma.$transaction([
-      prisma.workspace.update({
-        where: { id: workspaceId },
-        data: updateData,
-      }),
-      prisma.automation.updateMany({
-        where: { workspaceId, isActive: true },
-        data: { isActive: false },
-      }),
-    ]);
-  } else {
-    workspace = await prisma.workspace.update({
+  const workspace = await prisma.$transaction(async (transaction) => {
+    const updatedWorkspace = await transaction.workspace.update({
       where: { id: workspaceId },
       data: updateData,
     });
-  }
+
+    if (parsed.data.archived === true) {
+      await transaction.automation.updateMany({
+        where: { workspaceId, isActive: true },
+        data: { isActive: false },
+      });
+    }
+
+    if (
+      parsed.data.name !== undefined &&
+      updatedWorkspace.name !== membership.workspace.name
+    ) {
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId,
+          actorUserId: userId,
+          action: AUDIT_ACTIONS.workspaceRenamed,
+          targetType: "Workspace",
+          targetId: workspaceId,
+          metadata: {
+            previousName: membership.workspace.name,
+            name: updatedWorkspace.name,
+          },
+        }),
+      });
+    }
+
+    if (parsed.data.archived !== undefined) {
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId,
+          actorUserId: userId,
+          action: parsed.data.archived
+            ? AUDIT_ACTIONS.workspaceArchived
+            : AUDIT_ACTIONS.workspaceRestored,
+          targetType: "Workspace",
+          targetId: workspaceId,
+        }),
+      });
+    }
+
+    return updatedWorkspace;
+  });
 
   return NextResponse.json({
     success: true,

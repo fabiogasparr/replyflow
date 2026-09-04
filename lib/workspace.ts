@@ -1,4 +1,5 @@
 import type { Workspace, WorkspaceRole } from "@/app/generated/prisma/client";
+import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 import { prisma } from "@/lib/db/client";
 
 function normalizeInviteEmail(email: string) {
@@ -61,6 +62,16 @@ export async function acceptPendingInvitationsForUser(
           status: "ACCEPTED",
           acceptedAt: now,
         },
+      }),
+      prisma.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId: invitation.workspaceId,
+          actorUserId: userId,
+          action: AUDIT_ACTIONS.invitationAccepted,
+          targetType: "WorkspaceInvitation",
+          targetId: invitation.id,
+          metadata: { role: invitation.role },
+        }),
       }),
     ]);
   }
@@ -168,6 +179,17 @@ export async function createWorkspaceForUser(
     await transaction.user.update({
       where: { id: userId },
       data: { activeWorkspaceId: workspace.id },
+    });
+
+    await transaction.auditEvent.create({
+      data: createAuditEventData({
+        workspaceId: workspace.id,
+        actorUserId: userId,
+        action: AUDIT_ACTIONS.workspaceCreated,
+        targetType: "Workspace",
+        targetId: workspace.id,
+        metadata: { name: workspace.name },
+      }),
     });
 
     return workspace;

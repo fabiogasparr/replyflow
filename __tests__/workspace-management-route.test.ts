@@ -6,6 +6,7 @@ const { getCurrentUserId, mockPrisma } = vi.hoisted(() => ({
     workspaceMember: { findUnique: vi.fn() },
     workspace: { update: vi.fn() },
     automation: { updateMany: vi.fn() },
+    auditEvent: { create: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -37,6 +38,11 @@ const workspace = {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserId.mockResolvedValue("user_1");
+  mockPrisma.$transaction.mockImplementation(
+    async (callback: (client: typeof mockPrisma) => unknown) =>
+      callback(mockPrisma)
+  );
+  mockPrisma.auditEvent.create.mockResolvedValue({});
 });
 
 describe("PATCH /api/workspaces/[id]", () => {
@@ -80,6 +86,9 @@ describe("PATCH /api/workspaces/[id]", () => {
       where: { id: "workspace_1" },
       data: { name: "Cliente Horizonte" },
     });
+    expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "WORKSPACE_RENAMED" }),
+    });
 
     const archived = await PATCH(request({ archived: true }), context);
     expect(archived.status).toBe(403);
@@ -96,17 +105,15 @@ describe("PATCH /api/workspaces/[id]", () => {
     };
     mockPrisma.workspace.update.mockResolvedValue(archivedWorkspace);
     mockPrisma.automation.updateMany.mockResolvedValue({ count: 3 });
-    mockPrisma.$transaction.mockResolvedValue([
-      archivedWorkspace,
-      { count: 3 },
-    ]);
-
     const response = await PATCH(request({ archived: true }), context);
 
     expect(response.status).toBe(200);
     expect(mockPrisma.automation.updateMany).toHaveBeenCalledWith({
       where: { workspaceId: "workspace_1", isActive: true },
       data: { isActive: false },
+    });
+    expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "WORKSPACE_ARCHIVED" }),
     });
     await expect(response.json()).resolves.toMatchObject({
       success: true,

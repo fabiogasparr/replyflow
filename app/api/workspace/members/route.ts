@@ -13,6 +13,7 @@ import {
   canManageWorkspaceMember,
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
+import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 
 const inviteSchema = z.object({
   email: z.string().trim().email(),
@@ -175,45 +176,83 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await prisma.workspaceMember.upsert({
-      where: {
-        workspaceId_userId: {
+    await prisma.$transaction(async (transaction) => {
+      await transaction.workspaceMember.upsert({
+        where: {
+          workspaceId_userId: {
+            workspaceId: context.workspaceId,
+            userId: existingUser.id,
+          },
+        },
+        create: {
           workspaceId: context.workspaceId,
           userId: existingUser.id,
+          role: parsed.data.role,
         },
-      },
-      create: {
-        workspaceId: context.workspaceId,
-        userId: existingUser.id,
-        role: parsed.data.role,
-      },
-      update: {
-        role: parsed.data.role,
-      },
+        update: {
+          role: parsed.data.role,
+        },
+      });
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId: context.workspaceId,
+          actorUserId: context.userId,
+          action: existingMembership
+            ? AUDIT_ACTIONS.memberRoleChanged
+            : AUDIT_ACTIONS.memberAdded,
+          targetType: "User",
+          targetId: existingUser.id,
+          metadata: {
+            ...(existingMembership
+              ? { previousRole: existingMembership.role }
+              : {}),
+            role: parsed.data.role,
+          },
+        }),
+      });
     });
   } else {
-    await prisma.workspaceInvitation.upsert({
+    const existingInvitation = await prisma.workspaceInvitation.findUnique({
       where: {
-        workspaceId_email: {
+        workspaceId_email: { workspaceId: context.workspaceId, email },
+      },
+    });
+    await prisma.$transaction(async (transaction) => {
+      const invitation = await transaction.workspaceInvitation.upsert({
+        where: {
+          workspaceId_email: {
+            workspaceId: context.workspaceId,
+            email,
+          },
+        },
+        create: {
           workspaceId: context.workspaceId,
           email,
+          role: parsed.data.role,
+          token: generateInvitationToken(),
+          invitedByUserId: context.userId,
+          expiresAt: getInvitationExpiry(),
         },
-      },
-      create: {
-        workspaceId: context.workspaceId,
-        email,
-        role: parsed.data.role,
-        token: generateInvitationToken(),
-        invitedByUserId: context.userId,
-        expiresAt: getInvitationExpiry(),
-      },
-      update: {
-        role: parsed.data.role,
-        status: "PENDING",
-        token: generateInvitationToken(),
-        invitedByUserId: context.userId,
-        expiresAt: getInvitationExpiry(),
-      },
+        update: {
+          role: parsed.data.role,
+          status: "PENDING",
+          token: generateInvitationToken(),
+          invitedByUserId: context.userId,
+          expiresAt: getInvitationExpiry(),
+        },
+      });
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId: context.workspaceId,
+          actorUserId: context.userId,
+          action: existingInvitation
+            ? AUDIT_ACTIONS.invitationRenewed
+            : AUDIT_ACTIONS.memberInvited,
+          targetType: "WorkspaceInvitation",
+          targetId: invitation.id,
+          metadata: { role: parsed.data.role },
+        }),
+      });
     });
   }
 
@@ -264,9 +303,21 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  await prisma.workspaceMember.update({
-    where: { id: member.id },
-    data: { role: parsed.data.role },
+  await prisma.$transaction(async (transaction) => {
+    await transaction.workspaceMember.update({
+      where: { id: member.id },
+      data: { role: parsed.data.role },
+    });
+    await transaction.auditEvent.create({
+      data: createAuditEventData({
+        workspaceId: context.workspaceId,
+        actorUserId: context.userId,
+        action: AUDIT_ACTIONS.memberRoleChanged,
+        targetType: "User",
+        targetId: member.userId,
+        metadata: { previousRole: member.role, role: parsed.data.role },
+      }),
+    });
   });
 
   return NextResponse.json({
@@ -316,17 +367,51 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.workspaceMember.delete({ where: { id: member.id } });
+    await prisma.$transaction(async (transaction) => {
+      await transaction.workspaceMember.delete({ where: { id: member.id } });
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId: context.workspaceId,
+          actorUserId: context.userId,
+          action: AUDIT_ACTIONS.memberRemoved,
+          targetType: "User",
+          targetId: member.userId,
+          metadata: { role: member.role },
+        }),
+      });
+    });
   }
 
   if (parsed.data.invitationId) {
-    await prisma.workspaceInvitation.updateMany({
+    const invitation = await prisma.workspaceInvitation.findFirst({
       where: {
         id: parsed.data.invitationId,
         workspaceId: context.workspaceId,
         status: "PENDING",
       },
-      data: { status: "REVOKED" },
+    });
+    if (!invitation) {
+      return NextResponse.json(
+        { success: false, error: "Convite não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.workspaceInvitation.update({
+        where: { id: invitation.id },
+        data: { status: "REVOKED" },
+      });
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId: context.workspaceId,
+          actorUserId: context.userId,
+          action: AUDIT_ACTIONS.invitationRevoked,
+          targetType: "WorkspaceInvitation",
+          targetId: invitation.id,
+          metadata: { role: invitation.role },
+        }),
+      });
     });
   }
 

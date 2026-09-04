@@ -10,6 +10,7 @@ const { mockPrisma } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      upsert: vi.fn(),
     },
     workspaceInvitation: {
       findMany: vi.fn(),
@@ -18,6 +19,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     workspace: {
       create: vi.fn(),
     },
+    auditEvent: { create: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -27,6 +29,7 @@ vi.mock("@/lib/db/client", () => ({
 }));
 
 import {
+  acceptPendingInvitationsForUser,
   createWorkspaceForUser,
   getWorkspaceMembership,
   listUserWorkspaces,
@@ -50,6 +53,39 @@ beforeEach(() => {
 });
 
 describe("active workspace selection", () => {
+  it("records invitations accepted automatically after login", async () => {
+    mockPrisma.workspaceInvitation.findMany.mockResolvedValue([
+      {
+        id: "invitation_1",
+        workspaceId: "workspace_1",
+        role: "MEMBER",
+      },
+    ]);
+    mockPrisma.$transaction.mockImplementation(async (operations: unknown[]) =>
+      Promise.all(operations)
+    );
+
+    await acceptPendingInvitationsForUser("user_1", " PESSOA@EMPRESA.COM ");
+
+    expect(mockPrisma.workspaceInvitation.findMany).toHaveBeenCalledWith({
+      where: {
+        email: "pessoa@empresa.com",
+        status: "PENDING",
+        expiresAt: { gt: expect.any(Date) },
+      },
+    });
+    expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith({
+      data: {
+        workspaceId: "workspace_1",
+        actorUserId: "user_1",
+        action: "INVITATION_ACCEPTED",
+        targetType: "WorkspaceInvitation",
+        targetId: "invitation_1",
+        metadata: { role: "MEMBER" },
+      },
+    });
+  });
+
   it("uses the saved workspace only when the user is still a member", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       activeWorkspaceId: workspace.id,
@@ -145,6 +181,7 @@ describe("active workspace selection", () => {
     const transactionClient = {
       workspace: { create: vi.fn().mockResolvedValue(workspace) },
       user: { update: vi.fn().mockResolvedValue({}) },
+      auditEvent: { create: vi.fn().mockResolvedValue({}) },
     };
     mockPrisma.$transaction.mockImplementation(
       async (callback: (client: typeof transactionClient) => unknown) =>
@@ -165,6 +202,13 @@ describe("active workspace selection", () => {
     expect(transactionClient.user.update).toHaveBeenCalledWith({
       where: { id: "user_1" },
       data: { activeWorkspaceId: workspace.id },
+    });
+    expect(transactionClient.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        workspaceId: workspace.id,
+        actorUserId: "user_1",
+        action: "WORKSPACE_CREATED",
+      }),
     });
   });
 });

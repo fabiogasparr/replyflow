@@ -4,6 +4,7 @@ import {
   canManageInstagram,
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
+import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
   const context = await getCurrentWorkspaceContext();
@@ -25,11 +26,29 @@ export async function POST(request: NextRequest) {
   const instagramAccountId =
     typeof body.instagramAccountId === "string" ? body.instagramAccountId : null;
 
-  await prisma.instagramAccount.deleteMany({
-    where: {
-      workspaceId: context.workspaceId,
-      ...(instagramAccountId ? { id: instagramAccountId } : {}),
-    },
+  const accountFilter = {
+    workspaceId: context.workspaceId,
+    ...(instagramAccountId ? { id: instagramAccountId } : {}),
+  };
+  const accounts = await prisma.instagramAccount.findMany({
+    where: accountFilter,
+    select: { id: true, username: true },
+  });
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.instagramAccount.deleteMany({ where: accountFilter });
+    for (const account of accounts) {
+      await transaction.auditEvent.create({
+        data: createAuditEventData({
+          workspaceId: context.workspaceId,
+          actorUserId: context.userId,
+          action: AUDIT_ACTIONS.instagramDisconnected,
+          targetType: "InstagramAccount",
+          targetId: account.id,
+          metadata: { username: account.username },
+        }),
+      });
+    }
   });
 
   return NextResponse.json({ success: true });

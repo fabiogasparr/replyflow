@@ -45,7 +45,7 @@ Objetivo: apresentar um produto coerente com a marca ReplyFlow.
 - [x] Definir identidade visual e tom de voz.
 - [ ] Definir domínio de produção.
 - [x] Substituir referências visuais e textuais do OpenReply no código do produto.
-- [ ] Adicionar infraestrutura de internacionalização.
+- [x] Adicionar infraestrutura de internacionalização.
 - [ ] Traduzir site, autenticação, painel, mensagens de erro e e-mails.
 - [ ] Criar onboarding em etapas.
 - [ ] Explicar configuração da Meta em linguagem não técnica.
@@ -60,6 +60,8 @@ Progresso validado em 4 de setembro de 2026:
 - Superfícies redesenhadas usam pt-BR e foram verificadas em desktop e celular.
 - Termos, privacidade e exclusão de dados receberam uma primeira adaptação textual; ainda precisam de revisão jurídica antes da produção.
 - Configuração central de produto e títulos do painel adicionada com testes automatizados.
+- Catálogo tipado em pt-BR e formatadores compartilhados de datas e números adicionados com testes automatizados.
+- Início, campanhas, desempenho, conversas, histórico e diagnóstico passaram a usar textos e formatos brasileiros; a tradução das superfícies restantes continua em andamento.
 
 ## Marco 2 — SaaS multiempresa
 
@@ -172,7 +174,7 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 ## Próxima execução recomendada
 
 1. Tornar o repositório privado antes de iniciar código proprietário.
-2. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
+2. Concluir a tradução de configurações, contatos, mensagens de erro secundárias e e-mails.
 3. Evoluir contatos e inbox sobre a base multiempresa já validada.
 4. Adicionar cobrança recorrente e enforcement de uso por plano.
 5. Criar o painel administrativo global de clientes, planos e uso.

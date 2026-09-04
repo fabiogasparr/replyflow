@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
     });
 
     dailyDMs.push({
-      date: dayStart.toLocaleDateString("en-US", { weekday: "short" }),
+      date: dayStart.toLocaleDateString("pt-BR", { weekday: "short" }),
       count,
     });
   }

@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     console.error("[Instagram Posts] Error:", err);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch Instagram posts" },
+      { success: false, error: "Não foi possível carregar os posts do Instagram" },
       { status: 500 }
     );
   }

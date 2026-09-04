@@ -1,5 +1,7 @@
 "use client";
 
+import { translate } from "@/lib/i18n";
+
 export interface AccountOption {
   id: string;
   username: string;
@@ -32,7 +34,7 @@ export default function AccountSelect({
         onChange={(event) => onChange(event.target.value)}
         className="min-w-52 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent/40"
       >
-        {includeAll && <option value="all">All accounts</option>}
+        {includeAll && <option value="all">{translate("accounts.all")}</option>}
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
             @{account.username}
@@ -42,4 +44,3 @@ export default function AccountSelect({
     </label>
   );
 }
-

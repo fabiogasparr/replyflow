@@ -14,7 +14,7 @@ export async function GET() {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }

@@ -1,15 +1,16 @@
 /**
  * Status label for DM status. Plain text; color carries the state.
  */
+import { translate, type MessageKey } from "@/lib/i18n";
 
-const statusConfig: Record<string, { text: string; label: string }> = {
-  SENT: { text: "text-success", label: "Sent" },
-  FAILED: { text: "text-error", label: "Failed" },
-  PENDING: { text: "text-warning", label: "Pending" },
-  SKIPPED_DEDUP: { text: "text-muted", label: "Dedup" },
-  SKIPPED_RATE_LIMIT: { text: "text-warning", label: "Rate limited" },
-  SKIPPED_PLAN_LIMIT: { text: "text-warning", label: "Skipped" },
-  SKIPPED_NO_MATCH: { text: "text-muted", label: "No match" },
+const statusConfig: Record<string, { text: string; label: MessageKey }> = {
+  SENT: { text: "text-success", label: "status.sent" },
+  FAILED: { text: "text-error", label: "status.failed" },
+  PENDING: { text: "text-warning", label: "status.pending" },
+  SKIPPED_DEDUP: { text: "text-muted", label: "status.deduplicated" },
+  SKIPPED_RATE_LIMIT: { text: "text-warning", label: "status.rateLimited" },
+  SKIPPED_PLAN_LIMIT: { text: "text-warning", label: "status.planLimited" },
+  SKIPPED_NO_MATCH: { text: "text-muted", label: "status.noMatch" },
 };
 
 interface StatusBadgeProps {
@@ -21,7 +22,7 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
 
   return (
     <span className={`shrink-0 whitespace-nowrap text-sm ${config.text}`}>
-      {config.label}
+      {translate(config.label)}
     </span>
   );
 }

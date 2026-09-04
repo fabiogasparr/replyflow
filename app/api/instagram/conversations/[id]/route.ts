@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
   } catch (err) {
     console.error("[Conversation Messages] Error:", err);
     const message =
-      err instanceof MetaApiError ? err.message : "Failed to load messages";
+      err instanceof MetaApiError ? err.message : "Não foi possível carregar as mensagens";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

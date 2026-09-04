@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback } from "react";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import StatusBadge from "@/components/status-badge";
+import { formatDateTime, translate } from "@/lib/i18n";
 
 interface DmLog {
   id: string;
@@ -38,6 +39,16 @@ const STATUS_FILTERS = [
   "SKIPPED_PLAN_LIMIT",
   "SKIPPED_DEDUP",
 ];
+
+const STATUS_FILTER_LABELS: Record<string, string> = {
+  ALL: translate("common.all"),
+  SENT: translate("status.sent"),
+  FAILED: translate("status.failed"),
+  PENDING: translate("status.pending"),
+  SKIPPED_RATE_LIMIT: translate("status.rateLimited"),
+  SKIPPED_PLAN_LIMIT: translate("status.planLimited"),
+  SKIPPED_DEDUP: translate("status.deduplicated"),
+};
 
 export default function LogsPage() {
   const [logs, setLogs] = useState<DmLog[]>([]);
@@ -115,7 +126,7 @@ export default function LogsPage() {
                 }
               `}
             >
-              {status === "ALL" ? "All" : status.replace("SKIPPED_", "").replace("_", " ")}
+              {STATUS_FILTER_LABELS[status] ?? status}
             </button>
           ))}
         </div>
@@ -136,12 +147,12 @@ export default function LogsPage() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-left">
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Commenter</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Comment</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Campaign</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Account</th>
+                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Contato</th>
+                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Comentário</th>
+                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Automação</th>
+                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Conta</th>
                 <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Status</th>
-                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Time</th>
+                <th className="px-4 py-4 text-xs font-semibold text-muted uppercase tracking-wider sm:px-6">Data</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -159,7 +170,7 @@ export default function LogsPage() {
               {!loading && logs.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-muted sm:px-6">
-                    No logs found
+                    Nenhum envio encontrado
                   </td>
                 </tr>
               )}
@@ -184,9 +195,9 @@ export default function LogsPage() {
                       <StatusBadge status={log.status} />
                     </td>
                     <td className="px-4 py-4 text-muted whitespace-nowrap sm:px-6">
-                      {new Date(log.createdAt).toLocaleString("en-US", {
+                      {formatDateTime(log.createdAt, {
+                        day: "2-digit",
                         month: "short",
-                        day: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
@@ -201,8 +212,8 @@ export default function LogsPage() {
         {pagination && pagination.totalPages > 1 && (
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 border-t border-border sm:px-6">
             <p className="text-xs text-muted">
-              Showing {(pagination.page - 1) * pagination.limit + 1}–
-              {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
+              Exibindo {(pagination.page - 1) * pagination.limit + 1}–
+              {Math.min(pagination.page * pagination.limit, pagination.total)} de{" "}
               {pagination.total}
             </p>
             <div className="flex items-center gap-2">
@@ -214,7 +225,7 @@ export default function LogsPage() {
                 }}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border hover:text-foreground hover:border-border-hover transition-all disabled:opacity-30 disabled:pointer-events-none"
               >
-                Previous
+                {translate("common.previous")}
               </button>
               <span className="text-xs text-muted px-2">
                 {page} / {pagination.totalPages}
@@ -227,7 +238,7 @@ export default function LogsPage() {
                 }}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted border border-border hover:text-foreground hover:border-border-hover transition-all disabled:opacity-30 disabled:pointer-events-none"
               >
-                Next
+                {translate("common.next")}
               </button>
             </div>
           </div>

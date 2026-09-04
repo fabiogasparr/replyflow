@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     const message =
       err instanceof MetaApiError
         ? err.message
-        : "Failed to load conversations";
+        : "Não foi possível carregar as conversas";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     // Surface Meta's own message — the common case is the 24-hour messaging
     // window having closed, which the user needs to see explicitly.
     const message =
-      err instanceof MetaApiError ? err.message : "Failed to send message";
+      err instanceof MetaApiError ? err.message : "Não foi possível enviar a mensagem";
     return NextResponse.json({ success: false, error: message }, { status: 502 });
   }
 }

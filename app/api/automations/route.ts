@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
   const context = await getCurrentWorkspaceContext();
   if (!context) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
     linkCreates.push({
       workspaceId,
       slug: generateTrackedLinkSlug(),
-      label: secondaryButtonLabel?.trim() || "Open link",
+      label: secondaryButtonLabel?.trim() || "Abrir link",
       destinationUrl: secondaryDestinationUrl,
     });
   }
@@ -449,7 +449,7 @@ export async function PATCH(request: NextRequest) {
   const context = await getCurrentWorkspaceContext();
   if (!context) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -491,7 +491,7 @@ export async function PATCH(request: NextRequest) {
 
   if (!existing) {
     return NextResponse.json(
-      { success: false, error: "Campaign not found" },
+      { success: false, error: "Campanha não encontrada" },
       { status: 404 }
     );
   }
@@ -582,7 +582,7 @@ export async function PATCH(request: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
     const secondaryLink = links[1];
-    const secondaryLabel = secondaryButtonLabel?.trim() || "Open link";
+    const secondaryLabel = secondaryButtonLabel?.trim() || "Abrir link";
 
     if (secondaryDestinationUrl === "") {
       if (secondaryLink) {
@@ -615,7 +615,7 @@ export async function DELETE(request: NextRequest) {
   const context = await getCurrentWorkspaceContext();
   if (!context) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -643,7 +643,7 @@ export async function DELETE(request: NextRequest) {
 
   if (!existing) {
     return NextResponse.json(
-      { success: false, error: "Campaign not found" },
+      { success: false, error: "Campanha não encontrada" },
       { status: 404 }
     );
   }

@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     console.error("[Instagram Overview] Error:", err);
     return NextResponse.json(
-      { success: false, error: "Failed to load Instagram overview" },
+      { success: false, error: "Não foi possível carregar o desempenho do Instagram" },
       { status: 500 }
     );
   }

@@ -7,12 +7,14 @@
  */
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import BrandMark from "@/components/brand-mark";
 import {
   DASHBOARD_NAV_ITEMS,
   type DashboardNavKey,
 } from "@/lib/product";
+import type { UserWorkspaceOption } from "@/lib/workspace";
 
 const navIcons: Record<DashboardNavKey, React.ReactNode> = {
   dashboard: <path d="M4 13h6V4H4v9Zm10 7h6V11h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z" />,
@@ -28,14 +30,49 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   workspaceName: string;
+  activeWorkspaceId: string;
+  workspaces: UserWorkspaceOption[];
 }
 
 export default function Sidebar({
   isOpen,
   onClose,
   workspaceName,
+  activeWorkspaceId,
+  workspaces,
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const activeWorkspace = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId
+  );
+
+  async function switchWorkspace(workspaceId: string) {
+    if (workspaceId === activeWorkspaceId) return;
+
+    setSwitchingWorkspace(true);
+    setWorkspaceError(null);
+
+    const response = await fetch("/api/workspace/current", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId }),
+    });
+
+    if (response.ok) {
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    const payload = await response.json().catch(() => null);
+    setWorkspaceError(
+      payload?.error ?? "Não foi possível trocar o espaço de trabalho"
+    );
+    setSwitchingWorkspace(false);
+  }
 
   return (
     <>
@@ -102,11 +139,45 @@ export default function Sidebar({
 
         <div className="border-t border-[#27433a] px-4 py-4">
           <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#86a198]">
+            <label
+              htmlFor="workspace-switcher"
+              className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#86a198]"
+            >
               Espaço de trabalho
+            </label>
+            <div className="relative mt-2">
+              <select
+                id="workspace-switcher"
+                value={activeWorkspaceId}
+                disabled={switchingWorkspace || workspaces.length < 2}
+                onChange={(event) => void switchWorkspace(event.target.value)}
+                className="w-full appearance-none truncate rounded-lg border border-white/10 bg-[#18342b] py-2 pl-3 pr-8 text-sm font-semibold text-white outline-none transition focus:border-[#f5c451] disabled:cursor-default disabled:opacity-100"
+                aria-label="Selecionar espaço de trabalho"
+              >
+                {workspaces.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {workspace.name}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#9eb2aa]" aria-hidden="true">
+                {switchingWorkspace ? "…" : "⌄"}
+              </span>
+            </div>
+            <p className="mt-1.5 truncate text-[11px] text-[#9eb2aa]">
+              {activeWorkspace?.role === "OWNER"
+                ? "Proprietário"
+                : activeWorkspace?.role === "ADMIN"
+                  ? "Administrador"
+                  : activeWorkspace?.role === "MEMBER"
+                    ? "Membro"
+                    : workspaceName}
             </p>
-            <p className="mt-1 truncate text-sm font-semibold text-white">{workspaceName}</p>
-            <p className="mt-0.5 text-xs text-[#9eb2aa]">Ambiente seguro</p>
+            {workspaceError && (
+              <p className="mt-2 text-[11px] leading-4 text-[#ff9b84]">
+                {workspaceError}
+              </p>
+            )}
           </div>
         </div>
       </aside>

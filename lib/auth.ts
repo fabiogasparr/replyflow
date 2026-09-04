@@ -3,7 +3,7 @@ import Nodemailer from "next-auth/providers/nodemailer";
 import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db/client";
-import { ensureWorkspaceForUser, getPrimaryWorkspace } from "@/lib/workspace";
+import { ensureWorkspaceForUser, getActiveWorkspace } from "@/lib/workspace";
 import { isEmailAllowedToSignIn } from "@/lib/env";
 
 type AdapterPrismaClient = Parameters<typeof PrismaAdapter>[0];
@@ -72,7 +72,7 @@ export async function getCurrentWorkspaceId(): Promise<string | null> {
   const userId = await getCurrentUserId();
   if (!userId) return null;
 
-  const workspace = await getPrimaryWorkspace(userId);
+  const workspace = await getActiveWorkspace(userId);
   if (workspace) return workspace.id;
 
   const user = await prisma.user.findUnique({

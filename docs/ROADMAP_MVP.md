@@ -65,7 +65,7 @@ Progresso validado em 4 de setembro de 2026:
 
 Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 
-- [ ] Implementar seletor e workspace ativo persistente.
+- [x] Implementar seletor e workspace ativo persistente.
 - [ ] Permitir criação, edição e arquivamento de workspaces.
 - [ ] Revisar papéis `OWNER`, `ADMIN` e `MEMBER`.
 - [ ] Criar permissões granulares para campanhas, inbox, relatórios e cobrança.
@@ -75,6 +75,13 @@ Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 - [ ] Definir limites de contas do Instagram e membros por plano.
 
 Critério de saída: uma agência administra vários clientes sem risco de acesso cruzado.
+
+Progresso validado em 4 de setembro de 2026:
+
+- Workspace ativo persistido por usuário e validado contra `WorkspaceMember` em cada seleção.
+- Seleções antigas são reparadas automaticamente quando o acesso do usuário é removido.
+- Painel e APIs passam a resolver o mesmo workspace ativo; a troca remonta o painel para descartar estado do cliente anterior.
+- Migração aplicada em PostgreSQL real e contratos protegidos por testes de unidade e de rota.
 
 ## Marco 3 — Automação MVP
 

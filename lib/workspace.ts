@@ -1,9 +1,20 @@
-import { prisma } from "@/lib/db/client";
 import type { Workspace, WorkspaceRole } from "@/app/generated/prisma/client";
+import { prisma } from "@/lib/db/client";
 
 function normalizeInviteEmail(email: string) {
   return email.trim().toLowerCase();
 }
+
+export type WorkspaceMembership = {
+  workspace: Workspace;
+  role: WorkspaceRole;
+};
+
+export type UserWorkspaceOption = {
+  id: string;
+  name: string;
+  role: WorkspaceRole;
+};
 
 export async function acceptPendingInvitationsForUser(
   userId: string,
@@ -50,17 +61,97 @@ export async function acceptPendingInvitationsForUser(
   }
 }
 
-export async function getWorkspaceMembership(userId: string): Promise<{
-  workspace: Workspace;
-  role: WorkspaceRole;
-} | null> {
-  const membership = await prisma.workspaceMember.findFirst({
+/**
+ * Resolves the user's selected workspace only when a membership still exists.
+ * A stale selection can happen after membership removal; in that case the
+ * oldest remaining membership becomes active and is persisted for the next request.
+ */
+export async function getWorkspaceMembership(
+  userId: string
+): Promise<WorkspaceMembership | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { activeWorkspaceId: true },
+  });
+
+  if (user?.activeWorkspaceId) {
+    const activeMembership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId: user.activeWorkspaceId,
+          userId,
+        },
+      },
+      include: { workspace: true },
+    });
+
+    if (activeMembership) {
+      return {
+        workspace: activeMembership.workspace,
+        role: activeMembership.role,
+      };
+    }
+  }
+
+  const fallbackMembership = await prisma.workspaceMember.findFirst({
     where: { userId },
     include: { workspace: true },
     orderBy: { createdAt: "asc" },
   });
 
+  if (!fallbackMembership) return null;
+
+  if (user?.activeWorkspaceId !== fallbackMembership.workspaceId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { activeWorkspaceId: fallbackMembership.workspaceId },
+    });
+  }
+
+  return {
+    workspace: fallbackMembership.workspace,
+    role: fallbackMembership.role,
+  };
+}
+
+export async function listUserWorkspaces(
+  userId: string
+): Promise<UserWorkspaceOption[]> {
+  const memberships = await prisma.workspaceMember.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      role: true,
+      workspace: {
+        select: { id: true, name: true },
+      },
+    },
+  });
+
+  return memberships.map((membership) => ({
+    id: membership.workspace.id,
+    name: membership.workspace.name,
+    role: membership.role,
+  }));
+}
+
+export async function setActiveWorkspaceForUser(
+  userId: string,
+  workspaceId: string
+): Promise<WorkspaceMembership | null> {
+  const membership = await prisma.workspaceMember.findUnique({
+    where: {
+      workspaceId_userId: { workspaceId, userId },
+    },
+    include: { workspace: true },
+  });
+
   if (!membership) return null;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { activeWorkspaceId: workspaceId },
+  });
 
   return {
     workspace: membership.workspace,
@@ -79,9 +170,11 @@ export async function ensureWorkspaceForUser(
     return existingMembership.workspace;
   }
 
-  const workspaceName = email ? `${email.split("@")[0]}'s workspace` : "My workspace";
+  const workspaceName = email
+    ? `Espaço de ${email.split("@")[0]}`
+    : "Meu espaço de trabalho";
 
-  return prisma.workspace.create({
+  const workspace = await prisma.workspace.create({
     data: {
       name: workspaceName,
       ownerId: userId,
@@ -93,9 +186,21 @@ export async function ensureWorkspaceForUser(
       },
     },
   });
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { activeWorkspaceId: workspace.id },
+  });
+
+  return workspace;
 }
 
-export async function getPrimaryWorkspace(userId: string): Promise<Workspace | null> {
+export async function getActiveWorkspace(
+  userId: string
+): Promise<Workspace | null> {
   const membership = await getWorkspaceMembership(userId);
   return membership?.workspace ?? null;
 }
+
+/** @deprecated Use getActiveWorkspace. Kept for internal compatibility. */
+export const getPrimaryWorkspace = getActiveWorkspace;

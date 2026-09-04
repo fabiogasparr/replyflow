@@ -1230,6 +1230,7 @@ async function recordWorkerFailure(
     });
 
     await recordWorkerAlert({
+      workspaceId: account?.workspaceId ?? null,
       level: "error",
       message: error.message,
       jobId: job?.id,
@@ -1291,4 +1292,3 @@ export function createDMWorker(): Worker<DmQueueJob> {
 
   return worker;
 }
-

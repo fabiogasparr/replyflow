@@ -87,7 +87,10 @@ export async function PATCH(
 
   const workspace = await prisma.$transaction(async (transaction) => {
     const updatedWorkspace = await transaction.workspace.update({
-      where: { id: workspaceId },
+      where: {
+        id: workspaceId,
+        members: { some: { userId, role: membership.role } },
+      },
       data: updateData,
     });
 

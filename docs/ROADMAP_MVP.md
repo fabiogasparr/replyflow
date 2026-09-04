@@ -71,7 +71,7 @@ Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 - [x] Criar matriz de permissões para automações, inbox, relatórios, integrações, equipe e cobrança.
 - [x] Melhorar convites, expiração, renovação e revogação.
 - [x] Adicionar trilha de auditoria administrativa.
-- [ ] Revisar todas as queries para isolamento por workspace.
+- [x] Revisar todas as queries para isolamento por workspace.
 - [ ] Definir limites de contas do Instagram e membros por plano.
 
 Critério de saída: uma agência administra vários clientes sem risco de acesso cruzado.
@@ -89,6 +89,8 @@ Progresso validado em 4 de setembro de 2026:
 - Convites vencidos são expirados automaticamente; gestores podem copiar, renovar ou revogar links com retorno explícito na interface.
 - A trilha de auditoria registra ações administrativas de workspace, equipe, convites e conexões do Instagram, sempre isoladas pelo workspace ativo.
 - Somente proprietários e administradores consultam os 50 eventos mais recentes; tokens e conteúdo de conversas não são armazenados nos eventos.
+- Consultas autenticadas e mutações sensíveis foram revisadas para repetir o filtro de workspace; alertas Redis do worker agora são isolados antes de chegar ao diagnóstico.
+- Entradas públicas por capacidade e processos globais estão classificados em `docs/WORKSPACE_ISOLATION.md`, com invariantes e gate de verificação.
 
 ## Marco 3 — Automação MVP
 
@@ -168,7 +170,7 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 ## Próxima execução recomendada
 
 1. Tornar o repositório privado antes de iniciar código proprietário.
-2. Revisar sistematicamente todas as queries para garantir isolamento por workspace.
-3. Definir limites de contas do Instagram e integrantes por plano.
-4. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
-5. Evoluir contatos e inbox sobre a base multiempresa já validada.
+2. Definir limites de contas do Instagram e integrantes por plano.
+3. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
+4. Evoluir contatos e inbox sobre a base multiempresa já validada.
+5. Adicionar cobrança recorrente e enforcement de uso por plano.

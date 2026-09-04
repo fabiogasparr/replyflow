@@ -63,7 +63,10 @@ export async function POST(request: NextRequest) {
   }
 
   const existing = await prisma.automation.findMany({
-    where: { instagramAccountId: account.id },
+    where: {
+      workspaceId: context.workspaceId,
+      instagramAccountId: account.id,
+    },
     select: { postId: true },
   });
   const usedPostIds = new Set(existing.map((a) => a.postId));

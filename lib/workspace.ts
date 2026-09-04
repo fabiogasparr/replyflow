@@ -57,7 +57,7 @@ export async function acceptPendingInvitationsForUser(
         },
       }),
       prisma.workspaceInvitation.update({
-        where: { id: invitation.id },
+        where: { id: invitation.id, workspaceId: invitation.workspaceId },
         data: {
           status: "ACCEPTED",
           acceptedAt: now,

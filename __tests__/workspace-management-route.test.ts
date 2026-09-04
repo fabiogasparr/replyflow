@@ -83,7 +83,10 @@ describe("PATCH /api/workspaces/[id]", () => {
     );
     expect(renamed.status).toBe(200);
     expect(mockPrisma.workspace.update).toHaveBeenCalledWith({
-      where: { id: "workspace_1" },
+      where: {
+        id: "workspace_1",
+        members: { some: { userId: "user_1", role: "ADMIN" } },
+      },
       data: { name: "Cliente Horizonte" },
     });
     expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith({
@@ -132,7 +135,10 @@ describe("PATCH /api/workspaces/[id]", () => {
 
     expect(response.status).toBe(200);
     expect(mockPrisma.workspace.update).toHaveBeenCalledWith({
-      where: { id: "workspace_1" },
+      where: {
+        id: "workspace_1",
+        members: { some: { userId: "user_1", role: "OWNER" } },
+      },
       data: { archivedAt: null },
     });
     expect(mockPrisma.automation.updateMany).not.toHaveBeenCalled();

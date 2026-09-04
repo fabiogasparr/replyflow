@@ -305,7 +305,7 @@ export async function PATCH(request: NextRequest) {
 
   await prisma.$transaction(async (transaction) => {
     await transaction.workspaceMember.update({
-      where: { id: member.id },
+      where: { id: member.id, workspaceId: context.workspaceId },
       data: { role: parsed.data.role },
     });
     await transaction.auditEvent.create({
@@ -368,7 +368,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     await prisma.$transaction(async (transaction) => {
-      await transaction.workspaceMember.delete({ where: { id: member.id } });
+      await transaction.workspaceMember.delete({
+        where: { id: member.id, workspaceId: context.workspaceId },
+      });
       await transaction.auditEvent.create({
         data: createAuditEventData({
           workspaceId: context.workspaceId,
@@ -399,7 +401,7 @@ export async function DELETE(request: NextRequest) {
 
     await prisma.$transaction(async (transaction) => {
       await transaction.workspaceInvitation.update({
-        where: { id: invitation.id },
+        where: { id: invitation.id, workspaceId: context.workspaceId },
         data: { status: "REVOKED" },
       });
       await transaction.auditEvent.create({

@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
       if (automation.reportShareSlug) return automation;
 
       const updated = await prisma.automation.update({
-        where: { id: automation.id },
+        where: { id: automation.id, workspaceId },
         data: { reportShareSlug: generateReportShareSlug() },
         select: { reportShareSlug: true },
       });
@@ -537,7 +537,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const updated = await prisma.automation.update({
-    where: { id: automationId },
+    where: { id: automationId, workspaceId },
     data: automationData,
   });
 
@@ -545,17 +545,19 @@ export async function PATCH(request: NextRequest) {
   // destination URL was supplied. `undefined` means "leave it alone".
   if (trackedDestinationUrl !== undefined && trackedDestinationUrl !== null) {
     const primaryLink = await prisma.trackedLink.findFirst({
-      where: { automationId },
+      where: { automationId, workspaceId },
       orderBy: { createdAt: "asc" },
     });
 
     if (trackedDestinationUrl === "") {
       if (primaryLink) {
-        await prisma.trackedLink.delete({ where: { id: primaryLink.id } });
+        await prisma.trackedLink.delete({
+          where: { id: primaryLink.id, workspaceId },
+        });
       }
     } else if (primaryLink) {
       await prisma.trackedLink.update({
-        where: { id: primaryLink.id },
+        where: { id: primaryLink.id, workspaceId },
         data: { destinationUrl: trackedDestinationUrl },
       });
     } else {
@@ -576,7 +578,7 @@ export async function PATCH(request: NextRequest) {
   // second button's title.
   if (secondaryDestinationUrl !== undefined && secondaryDestinationUrl !== null) {
     const links = await prisma.trackedLink.findMany({
-      where: { automationId },
+      where: { automationId, workspaceId },
       orderBy: { createdAt: "asc" },
     });
     const secondaryLink = links[1];
@@ -584,11 +586,13 @@ export async function PATCH(request: NextRequest) {
 
     if (secondaryDestinationUrl === "") {
       if (secondaryLink) {
-        await prisma.trackedLink.delete({ where: { id: secondaryLink.id } });
+        await prisma.trackedLink.delete({
+          where: { id: secondaryLink.id, workspaceId },
+        });
       }
     } else if (secondaryLink) {
       await prisma.trackedLink.update({
-        where: { id: secondaryLink.id },
+        where: { id: secondaryLink.id, workspaceId },
         data: { destinationUrl: secondaryDestinationUrl, label: secondaryLabel },
       });
     } else {
@@ -644,7 +648,7 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  await prisma.automation.delete({ where: { id: automationId } });
+  await prisma.automation.delete({ where: { id: automationId, workspaceId } });
 
   return NextResponse.json({ success: true, data: { deleted: true } });
 }

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   if (invitation.expiresAt <= new Date()) {
     await prisma.workspaceInvitation.update({
-      where: { id: invitation.id },
+      where: { id: invitation.id, workspaceId: invitation.workspaceId },
       data: { status: "EXPIRED" },
     });
     return NextResponse.json(
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       update: { role: invitation.role },
     }),
     prisma.workspaceInvitation.update({
-      where: { id: invitation.id },
+      where: { id: invitation.id, workspaceId: invitation.workspaceId },
       data: { status: "ACCEPTED", acceptedAt: new Date() },
     }),
     prisma.user.update({

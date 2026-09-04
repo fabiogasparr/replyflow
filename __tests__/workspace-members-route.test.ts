@@ -194,7 +194,7 @@ describe("workspace member authorization", () => {
 
     expect(response.status).toBe(200);
     expect(mockPrisma.workspaceMember.update).toHaveBeenCalledWith({
-      where: { id: "member_admin" },
+      where: { id: "member_admin", workspaceId: "workspace_1" },
       data: { role: "MEMBER" },
     });
     expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith({

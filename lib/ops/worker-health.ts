@@ -20,6 +20,7 @@ export interface WorkerHealth {
 }
 
 export interface WorkerAlert {
+  workspaceId: string | null;
   level: "warning" | "error";
   message: string;
   jobId?: string;
@@ -83,14 +84,16 @@ export async function recordWorkerAlert(alert: Omit<WorkerAlert, "createdAt">) {
   await redis.ltrim(WORKER_ALERTS_KEY, 0, 24);
 }
 
-export async function getWorkerAlerts(limit = 10): Promise<WorkerAlert[]> {
-  const values = await getRedisConnection().lrange(
-    WORKER_ALERTS_KEY,
-    0,
-    Math.max(0, limit - 1)
-  );
+export async function getWorkerAlerts(
+  workspaceId: string,
+  limit = 10
+): Promise<WorkerAlert[]> {
+  const values = await getRedisConnection().lrange(WORKER_ALERTS_KEY, 0, -1);
 
   return values
     .map((value) => parseJson<WorkerAlert>(value))
-    .filter((value): value is WorkerAlert => Boolean(value));
+    .filter(
+      (value): value is WorkerAlert => value?.workspaceId === workspaceId
+    )
+    .slice(0, Math.max(0, limit));
 }

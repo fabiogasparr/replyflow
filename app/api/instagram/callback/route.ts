@@ -85,26 +85,53 @@ export async function GET(request: NextRequest) {
     }
 
     await prisma.$transaction(async (transaction) => {
-      const account = await transaction.instagramAccount.upsert({
-        where: { instagramId },
-        create: {
-          workspaceId: state.workspaceId,
-          instagramId,
-          username: userInfo.username,
-          name: userInfo.name,
-          accessToken: encryptedToken,
-          tokenExpiresAt,
-          webhookSubscribed,
+      const currentMembership = await transaction.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: state.workspaceId,
+            userId: session.user.id,
+          },
         },
-        update: {
-          workspaceId: state.workspaceId,
-          username: userInfo.username,
-          name: userInfo.name,
-          accessToken: encryptedToken,
-          tokenExpiresAt,
-          webhookSubscribed,
-        },
+        select: { role: true },
       });
+      if (!currentMembership || !canManageInstagram(currentMembership.role)) {
+        throw new Error("Workspace permission changed during Instagram connection");
+      }
+
+      const existingAccount = await transaction.instagramAccount.findUnique({
+        where: { instagramId },
+      });
+      if (
+        existingAccount &&
+        existingAccount.workspaceId !== state.workspaceId
+      ) {
+        throw new Error(
+          "Instagram account already connected to another workspace"
+        );
+      }
+
+      const account = existingAccount
+        ? await transaction.instagramAccount.update({
+            where: { id: existingAccount.id, workspaceId: state.workspaceId },
+            data: {
+              username: userInfo.username,
+              name: userInfo.name,
+              accessToken: encryptedToken,
+              tokenExpiresAt,
+              webhookSubscribed,
+            },
+          })
+        : await transaction.instagramAccount.create({
+            data: {
+              workspaceId: state.workspaceId,
+              instagramId,
+              username: userInfo.username,
+              name: userInfo.name,
+              accessToken: encryptedToken,
+              tokenExpiresAt,
+              webhookSubscribed,
+            },
+          });
       await transaction.auditEvent.create({
         data: createAuditEventData({
           workspaceId: state.workspaceId,

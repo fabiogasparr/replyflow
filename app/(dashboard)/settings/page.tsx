@@ -57,6 +57,9 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     Promise.all([
@@ -69,12 +72,6 @@ export default function SettingsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
-
-  async function refreshMembers() {
-    const res = await fetch("/api/workspace/members");
-    const payload = await res.json();
-    if (payload.success) setMembersData(payload.data);
-  }
 
   async function disconnectInstagram(instagramAccountId: string) {
     if (!confirm("Desconectar o Instagram? As automações desta conta deixarão de enviar mensagens.")) {
@@ -110,14 +107,46 @@ export default function SettingsPage() {
   }
 
   async function removeInvitation(invitationId: string) {
+    setMemberError(null);
     setBusy(`invite:${invitationId}`);
-    await fetch("/api/workspace/members", {
+    const res = await fetch("/api/workspace/members", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ invitationId }),
     });
-    await refreshMembers();
+    const payload = await res.json();
+    if (payload.success) {
+      setMembersData(payload.data);
+    } else {
+      setMemberError(payload.error ?? "Não foi possível revogar o convite");
+    }
     setBusy(null);
+  }
+
+  async function renewInvitation(invitation: WorkspaceMembersData["invitations"][number]) {
+    setMemberError(null);
+    setBusy(`renew:${invitation.id}`);
+    const res = await fetch("/api/workspace/members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: invitation.email,
+        role: invitation.role,
+      }),
+    });
+    const payload = await res.json();
+    if (payload.success) {
+      setMembersData(payload.data);
+    } else {
+      setMemberError(payload.error ?? "Não foi possível renovar o convite");
+    }
+    setBusy(null);
+  }
+
+  async function copyInvitation(invitationId: string, inviteUrl: string) {
+    await navigator.clipboard.writeText(inviteUrl);
+    setCopiedInvitationId(invitationId);
+    window.setTimeout(() => setCopiedInvitationId(null), 1800);
   }
 
   async function updateMemberRole(
@@ -346,18 +375,27 @@ export default function SettingsPage() {
                     </p>
                     <p className="truncate text-xs text-muted">
                       {invitation.role === "ADMIN" ? "Administrador" : "Membro"} ·{" "}
-                      {invitation.inviteUrl}
+                      válido até{" "}
+                      {new Date(invitation.expiresAt).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() =>
-                        void navigator.clipboard?.writeText(invitation.inviteUrl)
+                        void copyInvitation(invitation.id, invitation.inviteUrl)
                       }
                       className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-border-hover hover:text-foreground"
                     >
-                      Copiar
+                      {copiedInvitationId === invitation.id ? "Copiado" : "Copiar link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void renewInvitation(invitation)}
+                      disabled={busy !== null}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-border-hover hover:text-foreground disabled:opacity-50"
+                    >
+                      {busy === `renew:${invitation.id}` ? "Renovando..." : "Renovar"}
                     </button>
                     <button
                       type="button"

@@ -15,7 +15,7 @@ import {
 } from "@/lib/workspace-access";
 
 const inviteSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   role: z.enum(["ADMIN", "MEMBER"]).default("MEMBER"),
 });
 
@@ -53,21 +53,36 @@ async function getMemberPayload(
     },
   });
 
-  const invitations =
-    currentUser && canManageMembers(currentUser.role)
-      ? await prisma.workspaceInvitation.findMany({
-          where: { workspaceId, status: "PENDING" },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            email: true,
-            role: true,
-            token: true,
-            expiresAt: true,
-            createdAt: true,
-          },
-        })
-      : [];
+  let invitations: Array<{
+    id: string;
+    email: string;
+    role: "OWNER" | "ADMIN" | "MEMBER";
+    token: string;
+    expiresAt: Date;
+    createdAt: Date;
+  }> = [];
+  if (currentUser && canManageMembers(currentUser.role)) {
+    await prisma.workspaceInvitation.updateMany({
+      where: {
+        workspaceId,
+        status: "PENDING",
+        expiresAt: { lte: new Date() },
+      },
+      data: { status: "EXPIRED" },
+    });
+    invitations = await prisma.workspaceInvitation.findMany({
+      where: { workspaceId, status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        token: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
+  }
 
   return {
     ...(currentUser

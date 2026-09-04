@@ -69,7 +69,7 @@ Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 - [x] Permitir criação, edição, arquivamento e restauração de workspaces.
 - [x] Revisar papéis `OWNER`, `ADMIN` e `MEMBER`.
 - [x] Criar matriz de permissões para automações, inbox, relatórios, integrações, equipe e cobrança.
-- [ ] Melhorar convites, expiração, reenvio e revogação.
+- [x] Melhorar convites, expiração, renovação e revogação.
 - [ ] Adicionar trilha de auditoria administrativa.
 - [ ] Revisar todas as queries para isolamento por workspace.
 - [ ] Definir limites de contas do Instagram e membros por plano.
@@ -86,6 +86,7 @@ Progresso validado em 4 de setembro de 2026:
 - Arquivar preserva os dados e pausa automações ativas; restaurar não reativa campanhas sem revisão do usuário.
 - Proprietários controlam cobrança, arquivamento e administradores; administradores operam integrações, automações e membros comuns.
 - Membros não recebem tokens de convites pendentes e convites repetidos nunca alteram o papel do proprietário.
+- Convites vencidos são expirados automaticamente; gestores podem copiar, renovar ou revogar links com retorno explícito na interface.
 
 ## Marco 3 — Automação MVP
 

@@ -71,6 +71,24 @@ describe("workspace member authorization", () => {
       invitations: [],
     });
     expect(mockPrisma.workspaceInvitation.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.workspaceInvitation.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("expires old pending invitations before returning manager data", async () => {
+    getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
+    mockPrisma.workspaceInvitation.updateMany.mockResolvedValue({ count: 2 });
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.workspaceInvitation.updateMany).toHaveBeenCalledWith({
+      where: {
+        workspaceId: "workspace_1",
+        status: "PENDING",
+        expiresAt: { lte: expect.any(Date) },
+      },
+      data: { status: "EXPIRED" },
+    });
   });
 
   it("prevents admins from inviting another admin", async () => {
@@ -98,6 +116,38 @@ describe("workspace member authorization", () => {
 
     expect(response.status).toBe(403);
     expect(mockPrisma.workspaceMember.upsert).not.toHaveBeenCalled();
+  });
+
+  it("renews a pending invitation with a fresh token and expiry", async () => {
+    getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.workspaceInvitation.upsert.mockResolvedValue({});
+    mockPrisma.workspaceInvitation.updateMany.mockResolvedValue({ count: 0 });
+
+    const response = await POST(
+      request("POST", { email: " pessoa@example.com ", role: "MEMBER" })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.workspaceInvitation.upsert).toHaveBeenCalledWith({
+      where: {
+        workspaceId_email: {
+          workspaceId: "workspace_1",
+          email: "pessoa@example.com",
+        },
+      },
+      create: expect.objectContaining({
+        workspaceId: "workspace_1",
+        email: "pessoa@example.com",
+        token: expect.any(String),
+        expiresAt: expect.any(Date),
+      }),
+      update: expect.objectContaining({
+        status: "PENDING",
+        token: expect.any(String),
+        expiresAt: expect.any(Date),
+      }),
+    });
   });
 
   it("prevents admins from demoting other admins", async () => {

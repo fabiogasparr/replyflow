@@ -2,44 +2,43 @@ import type { Metadata } from "next";
 import LegalShell from "@/components/legal-shell";
 
 export const metadata: Metadata = {
-  title: "Data Deletion - OpenReply",
+  title: "Exclusão de Dados",
   description:
-    "How OpenReply customers can disconnect Instagram and request account or campaign data deletion.",
+    "Como desconectar o Instagram e solicitar a exclusão de dados no ReplyFlow.",
 };
 
 export default function DataDeletionPage() {
   return (
     <LegalShell
-      title="Data Deletion"
-      description="Use this page for Meta App Review and customer requests about removing OpenReply account, workspace, Instagram, and campaign data."
-      updatedAt="May 24, 2026"
+      title="Exclusão de Dados"
+      description="Use esta página para solicitar a remoção de dados de conta, espaço de trabalho, Instagram e campanhas do ReplyFlow."
+      updatedAt="4 de setembro de 2026"
     >
       <section>
-        <h2 className="text-xl font-bold text-white">Disconnect Instagram</h2>
+        <h2 className="text-xl font-bold text-foreground">Desconectar o Instagram</h2>
         <p className="mt-3">
-          Sign in, open Settings, and select Disconnect. This removes the stored
-          Instagram connection token and stops campaigns from sending private
-          replies for that workspace.
+          Entre na plataforma, abra Configurações e selecione Desconectar. Isso remove
+          o token armazenado da conexão com o Instagram e interrompe os envios de
+          respostas privadas para esse espaço de trabalho.
         </p>
       </section>
 
       <section>
-        <h2 className="text-xl font-bold text-white">Delete Workspace Data</h2>
+        <h2 className="text-xl font-bold text-foreground">Excluir dados do espaço de trabalho</h2>
         <p className="mt-3">
-          To delete workspace, campaign, log, webhook, billing reference, and
-          operational diagnostic data, contact support from the email address
-          used to sign in. Include the workspace name and the Instagram username
-          connected to the workspace.
+          Para excluir dados do espaço de trabalho, campanhas, registros, webhooks,
+          referências de cobrança e diagnósticos operacionais, contate o suporte pelo
+          e-mail usado no acesso. Informe o nome do espaço e o usuário do Instagram conectado.
         </p>
       </section>
 
       <section>
-        <h2 className="text-xl font-bold text-white">Verification</h2>
+        <h2 className="text-xl font-bold text-foreground">Verificação</h2>
         <p className="mt-3">
-          We may ask you to verify control of the email address or connected
-          business account before deleting data. Deletion requests are processed
-          as quickly as practical unless retention is required for legal,
-          billing, fraud prevention, or security reasons.
+          Podemos solicitar a confirmação do controle sobre o e-mail ou a conta
+          profissional conectada antes da exclusão. Pedidos são processados assim que
+          possível, salvo quando a retenção for necessária por motivos legais, de
+          cobrança, prevenção a fraude ou segurança.
         </p>
       </section>
     </LegalShell>

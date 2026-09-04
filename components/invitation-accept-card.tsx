@@ -31,7 +31,7 @@ export default function InvitationAcceptCard({
       router.push("/dashboard");
       return;
     }
-    setMessage(payload.error ?? "Could not accept invitation");
+    setMessage(payload.error ?? "Não foi possível aceitar o convite");
     setBusy(false);
   }
 
@@ -41,7 +41,7 @@ export default function InvitationAcceptCard({
         href="/login"
         className="inline-flex items-center justify-center rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-hover"
       >
-        Sign in to accept
+        Entrar para aceitar
       </a>
     );
   }
@@ -54,11 +54,11 @@ export default function InvitationAcceptCard({
         disabled={busy}
         className="inline-flex items-center justify-center rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50"
       >
-        {busy ? "Accepting..." : "Accept invitation"}
+        {busy ? "Aceitando..." : "Aceitar convite"}
       </button>
       {message && <p className="text-sm text-error">{message}</p>}
       <p className="text-xs text-muted">
-        Use the magic link account for {invitedEmail}.
+        Use a conta acessada pelo link enviado para {invitedEmail}.
       </p>
     </div>
   );

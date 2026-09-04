@@ -8,11 +8,11 @@ import { useSyncExternalStore } from "react";
  * a demo — naming this domain on their site would tell their visitors the
  * opposite of the truth.
  */
-const DEMO_HOST = "openreply.diwen.dev";
+const DEMO_HOST = process.env.NEXT_PUBLIC_DEMO_HOST ?? "";
 
-const DISMISS_KEY = "openreply:demo-notice-dismissed";
+const DISMISS_KEY = "replyflow:demo-notice-dismissed";
 const SETUP_DOCS_URL =
-  "https://github.com/diwenne/openreply/blob/main/docs/setup.md";
+  "https://github.com/fabiogasparr/replyflow/blob/main/docs/setup.md";
 
 /// Module-level so both variants agree, and so dismissing survives a
 /// client-side navigation between the landing page and the login page.
@@ -42,7 +42,7 @@ function subscribe(onChange: () => void) {
 /// false. Rendering on the server instead would flash the notice onto every
 /// instance that is not the demo.
 function getSnapshot(): boolean {
-  return window.location.hostname === DEMO_HOST && !isDismissed();
+  return Boolean(DEMO_HOST) && window.location.hostname === DEMO_HOST && !isDismissed();
 }
 
 function getServerSnapshot(): boolean {
@@ -72,23 +72,22 @@ export function DemoNotice({ variant }: { variant: "banner" | "panel" }) {
     return (
       <div className="relative border-b border-orange-200 bg-orange-50">
         <p className="mx-auto w-full max-w-6xl px-10 py-2 text-center text-xs leading-5 text-zinc-700 sm:px-14 sm:text-sm">
-          <span className="font-bold text-zinc-900">{DEMO_HOST}</span> is a
-          demo. OpenReply is self-hosted — signing in here will not send DMs for
-          your account.{" "}
+          <span className="font-bold text-zinc-900">{DEMO_HOST}</span> é uma
+          demonstração. Entrar aqui não enviará mensagens pela sua conta.{" "}
           <a
             href={SETUP_DOCS_URL}
             target="_blank"
             rel="noreferrer"
             className="font-bold text-orange-700 underline underline-offset-2 transition hover:text-orange-800"
           >
-            Deploy your own copy
+            Veja como configurar sua instância
           </a>
           .
         </p>
         <button
           type="button"
           onClick={dismiss}
-          aria-label="Dismiss demo notice"
+          aria-label="Fechar aviso de demonstração"
           className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-500 transition hover:text-zinc-900 sm:right-4"
         >
           <DismissIcon />
@@ -100,24 +99,23 @@ export function DemoNotice({ variant }: { variant: "banner" | "panel" }) {
   return (
     <div className="relative mb-5 rounded border border-warning/30 bg-warning/10 px-4 py-3 pr-10">
       <p className="text-sm leading-6 text-foreground">
-        <span className="font-semibold">{DEMO_HOST} is a demo instance.</span>{" "}
-        Signing in here will not send DMs for your Instagram account. OpenReply
-        is self-hosted, so it only works on a deployment you run yourself, with
-        your own Meta app and your own domain.{" "}
+        <span className="font-semibold">{DEMO_HOST} é um ambiente de demonstração.</span>{" "}
+        Entrar aqui não enviará mensagens pela sua conta do Instagram. Use sua
+        própria configuração da Meta e o domínio do seu ambiente.{" "}
         <a
           href={SETUP_DOCS_URL}
           target="_blank"
           rel="noreferrer"
           className="font-semibold text-warning underline underline-offset-2"
         >
-          Read the setup guide
+          Ler o guia de configuração
         </a>
         .
       </p>
       <button
         type="button"
         onClick={dismiss}
-        aria-label="Dismiss demo notice"
+        aria-label="Fechar aviso de demonstração"
         className="absolute right-1 top-1 p-2 text-muted transition hover:text-foreground"
       >
         <DismissIcon />

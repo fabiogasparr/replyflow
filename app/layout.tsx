@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { PRODUCT } from "@/lib/product";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OpenReply - Open source Instagram comment-to-DM automation",
-  description:
-    "A free, self-hosted ManyChat alternative. Send an Instagram DM automatically when someone comments a keyword on your post or reel, using the official Meta API.",
+  title: {
+    default: "ReplyFlow — comentários que viram conversas",
+    template: "%s | ReplyFlow",
+  },
+  description: PRODUCT.description,
   keywords: [
     "instagram automation",
     "comment to DM",
@@ -16,7 +19,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "OpenReply",
+    title: PRODUCT.name,
     statusBarStyle: "black-translucent",
   },
   icons: {
@@ -29,7 +32,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#18181b",
+  themeColor: "#112620",
   width: "device-width",
   initialScale: 1,
   // Installed on iOS the app owns the full screen, notch included; the safe
@@ -43,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full dark">
+    <html lang="pt-BR" className="h-full">
       <body
         className="min-h-full bg-background text-foreground font-sans antialiased"
         // Clears the home indicator when installed; 0 everywhere else.

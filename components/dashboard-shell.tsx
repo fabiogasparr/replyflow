@@ -39,7 +39,7 @@ export default function DashboardShell({
         {/* overflow-x-hidden: enabling vertical scrolling makes the browser
             allow horizontal scrolling too, which lets a wide child drag the
             whole page sideways on a phone. */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        <main className="brand-dots flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="px-4 lg:px-8 py-5 sm:py-6 max-w-7xl mx-auto">
             {children}
           </div>

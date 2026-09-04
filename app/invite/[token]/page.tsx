@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import InvitationAcceptCard from "@/components/invitation-accept-card";
+import BrandMark from "@/components/brand-mark";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 
@@ -10,7 +10,7 @@ type InvitePageProps = {
 };
 
 export const metadata: Metadata = {
-  title: "Accept Workspace Invitation - OpenReply",
+  title: "Aceitar convite",
   robots: { index: false, follow: false },
 };
 
@@ -35,24 +35,24 @@ export default async function InvitePage({ params }: InvitePageProps) {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-5 py-12">
-        <Link href="/" className="mb-8 text-sm font-bold text-cyan-100">
-          OpenReply
-        </Link>
-        <section className="border border-white/10 bg-white/[0.035] p-8">
-          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">
-            Workspace invitation
+        <div className="mb-8">
+          <BrandMark />
+        </div>
+        <section className="rounded-2xl border border-border bg-white p-8 shadow-[0_22px_70px_rgba(17,38,32,0.08)]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+            Convite para equipe
           </p>
-          <h1 className="mt-4 text-3xl font-black leading-tight text-white">
-            Join {invitation.workspace.name}
+          <h1 className="font-display mt-4 text-3xl font-bold leading-tight text-foreground">
+            Entre em {invitation.workspace.name}
           </h1>
-          <p className="mt-4 text-sm leading-6 text-zinc-400">
-            You were invited as {invitation.role.toLowerCase()} for{" "}
-            {invitation.email}.
+          <p className="mt-4 text-sm leading-6 text-muted">
+            O convite foi enviado para {invitation.email} com o perfil{" "}
+            {invitation.role.toLowerCase()}.
           </p>
           <div className="mt-8">
             {expired ? (
               <p className="text-sm text-error">
-                This invitation has expired. Ask the workspace owner to resend it.
+                Este convite expirou. Peça ao responsável pelo espaço para enviá-lo novamente.
               </p>
             ) : (
               <InvitationAcceptCard
@@ -67,4 +67,3 @@ export default async function InvitePage({ params }: InvitePageProps) {
     </main>
   );
 }
-

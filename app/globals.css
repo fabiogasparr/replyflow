@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
-/* ManyChat Alternative — Design System
-   Plain and functional. No gradients, glass, glow, or animation. */
+/* ReplyFlow — Brazilian social commerce design system. */
 
 @theme inline {
-  --color-background: #ffffff;
-  --color-foreground: #18181b;
-  --color-surface: #f7f7f8;
-  --color-surface-hover: #efeff1;
-  --color-border: #e4e4e7;
-  --color-border-hover: #d4d4d8;
-  --color-muted: #71717a;
-  --color-accent: #f97316;
-  --color-accent-hover: #ea580c;
-  --color-success: #16a34a;
-  --color-error: #dc2626;
-  --color-warning: #d97706;
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-background: #fbf8f2;
+  --color-foreground: #112620;
+  --color-surface: #f3eee4;
+  --color-surface-hover: #ebe3d6;
+  --color-border: #ded5c6;
+  --color-border-hover: #c9bcaa;
+  --color-muted: #66736e;
+  --color-accent: #ff6b4a;
+  --color-accent-hover: #e95538;
+  --color-success: #1d7a5d;
+  --color-error: #c9453a;
+  --color-warning: #b87913;
+  --font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, monospace;
 }
 
@@ -28,6 +28,50 @@ body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+}
+
+::selection {
+  background: #f5c451;
+  color: #112620;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.brand-grid {
+  background-image:
+    linear-gradient(#ded5c6 1px, transparent 1px),
+    linear-gradient(90deg, #ded5c6 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.brand-dots {
+  background-image: radial-gradient(#9ca69e 0.8px, transparent 0.8px);
+  background-size: 14px 14px;
+}
+
+@keyframes replyflow-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.replyflow-rise {
+  animation: replyflow-rise 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.replyflow-rise-delay-1 {
+  animation-delay: 100ms;
+}
+
+.replyflow-rise-delay-2 {
+  animation-delay: 190ms;
 }
 
 /* Focus ring — visible, for keyboard users. */

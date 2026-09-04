@@ -1,10 +1,12 @@
+import Link from "next/link";
+import BrandMark from "@/components/brand-mark";
+import { DemoNotice } from "@/components/demo-notice";
 import { EMAIL_PROVIDER_ID, signIn } from "@/lib/auth";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
-import { DemoNotice } from "@/components/demo-notice";
 
 export const metadata = {
-  title: "Login - OpenReply",
-  description: "Sign in to manage Instagram comment-to-DM campaigns.",
+  title: "Entrar",
+  description: "Acesse o ReplyFlow para gerenciar suas automações no Instagram.",
 };
 
 export default async function LoginPage({
@@ -33,71 +35,135 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-foreground">
-            OpenReply
+    <main className="grid min-h-screen bg-background lg:grid-cols-[0.88fr_1.12fr]">
+      <section className="relative hidden overflow-hidden bg-[#112620] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
+        <div className="brand-grid absolute inset-0 opacity-[0.055]" aria-hidden="true" />
+        <div className="relative">
+          <BrandMark tone="light" />
+        </div>
+
+        <div className="relative max-w-xl">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#f5c451]">
+            Automação que conversa
+          </p>
+          <h1 className="font-display mt-5 text-5xl font-bold leading-[1.04] tracking-[-0.045em] xl:text-6xl">
+            Seu próximo cliente pode estar em um comentário.
           </h1>
-          <p className="text-muted text-sm leading-relaxed mt-2">
-            {selectedTemplate
-              ? `Sign in to use the ${selectedTemplate.title} template.`
-              : "Sign in by email, then connect your Instagram professional account."}
+          <p className="mt-6 max-w-lg text-base leading-7 text-[#b8c7c1]">
+            Conecte o Instagram, escolha as palavras-chave e deixe o ReplyFlow
+            transformar interesse em conversa — com rastreabilidade de ponta a ponta.
           </p>
         </div>
 
-        <DemoNotice variant="panel" />
-
-        <div className="panel rounded p-8 shadow-black/40">
-          {selectedTemplate && !checkEmail && (
-            <div className="mb-5 border border-accent/20 bg-accent/10 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
-                Template selected
-              </p>
-              <p className="mt-2 text-sm font-semibold text-foreground">
-                {selectedTemplate.title}
-              </p>
-            </div>
-          )}
-
-          {checkEmail ? (
-            <div className="text-center py-4">
-              <h2 className="text-lg font-semibold mb-2">Check your email</h2>
-              <p className="text-sm text-muted">
-                We sent you a secure sign-in link. Open it on this device to
-                continue.
-              </p>
-            </div>
-          ) : (
-            <form action={sendMagicLink} className="space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-foreground"
-                >
-                  Work email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="you@company.com"
-                  className="w-full px-4 py-3 rounded bg-surface border border-border text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none transition-colors"
-                />
+        <div className="relative grid grid-cols-3 gap-3 text-xs text-[#b8c7c1]">
+          {["API oficial da Meta", "Tokens criptografados", "Envios monitorados"].map(
+            (item) => (
+              <div key={item} className="border-t border-white/15 pt-3">
+                {item}
               </div>
-
-              <button
-                type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 rounded bg-accent px-6 py-3.5 text-sm font-semibold text-white shadow-indigo-500/25 transition-all hover:shadow-indigo-500/30"
-              >
-                Email me a magic link
-              </button>
-            </form>
+            )
           )}
         </div>
-      </div>
-    </div>
+      </section>
+
+      <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
+        <div className="replyflow-rise w-full max-w-md">
+          <div className="mb-10 flex items-center justify-between lg:hidden">
+            <BrandMark />
+            <Link href="/" className="text-sm font-semibold text-muted hover:text-foreground">
+              Voltar
+            </Link>
+          </div>
+
+          <div className="mb-7">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">
+              Área segura
+            </p>
+            <h2 className="font-display mt-3 text-4xl font-bold tracking-[-0.04em] text-foreground">
+              {checkEmail ? "Confira seu e-mail" : "Bem-vindo de volta"}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              {checkEmail
+                ? "Enviamos um link seguro para você entrar sem precisar memorizar outra senha."
+                : selectedTemplate
+                  ? `Entre para usar o modelo “${selectedTemplate.title}”.`
+                  : "Use seu e-mail profissional para acessar o seu espaço de trabalho."}
+            </p>
+          </div>
+
+          <DemoNotice variant="panel" />
+
+          <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_22px_70px_rgba(17,38,32,0.09)] sm:p-8">
+            {selectedTemplate && !checkEmail && (
+              <div className="mb-5 rounded-xl border border-[#ff6b4a]/25 bg-[#fff1ec] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
+                  Modelo selecionado
+                </p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
+                  {selectedTemplate.title}
+                </p>
+              </div>
+            )}
+
+            {checkEmail ? (
+              <div className="py-3">
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-[#e3f2eb] text-success">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-none stroke-current stroke-2">
+                    <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <p className="mt-5 text-sm leading-6 text-muted">
+                  Abra o link neste dispositivo. Se ele não aparecer em alguns minutos,
+                  verifique também a caixa de spam.
+                </p>
+                <Link
+                  href="/login"
+                  className="mt-5 inline-flex text-sm font-bold text-foreground underline decoration-accent decoration-2 underline-offset-4"
+                >
+                  Usar outro e-mail
+                </Link>
+              </div>
+            ) : (
+              <form action={sendMagicLink} className="space-y-5">
+                <div className="space-y-2">
+                  <label htmlFor="email" className="block text-sm font-semibold text-foreground">
+                    E-mail profissional
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="voce@empresa.com.br"
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-[#9aa49f] transition-colors focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#112620] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#1c3a31]"
+                >
+                  Receber link de acesso
+                  <span aria-hidden="true">→</span>
+                </button>
+              </form>
+            )}
+          </div>
+
+          <p className="mt-5 text-center text-xs leading-5 text-muted">
+            Ao continuar, você concorda com os nossos{" "}
+            <Link href="/terms" className="font-semibold text-foreground underline underline-offset-2">
+              Termos de Uso
+            </Link>{" "}
+            e a{" "}
+            <Link href="/privacy" className="font-semibold text-foreground underline underline-offset-2">
+              Política de Privacidade
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
+    </main>
   );
 }

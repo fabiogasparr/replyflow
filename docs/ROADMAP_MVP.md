@@ -42,8 +42,9 @@ Critério de saída: ambiente reproduzível, auditoria de segurança tratada, CI
 
 Objetivo: apresentar um produto coerente com a marca ReplyFlow.
 
-- [ ] Definir identidade visual, domínio e tom de voz.
-- [ ] Substituir referências visuais e textuais do OpenReply.
+- [x] Definir identidade visual e tom de voz.
+- [ ] Definir domínio de produção.
+- [x] Substituir referências visuais e textuais do OpenReply no código do produto.
 - [ ] Adicionar infraestrutura de internacionalização.
 - [ ] Traduzir site, autenticação, painel, mensagens de erro e e-mails.
 - [ ] Criar onboarding em etapas.
@@ -52,6 +53,13 @@ Objetivo: apresentar um produto coerente com a marca ReplyFlow.
 - [ ] Garantir acessibilidade e experiência responsiva.
 
 Critério de saída: usuário brasileiro consegue criar uma conta e entender o produto sem documentação técnica externa.
+
+Progresso validado em 4 de setembro de 2026:
+
+- Landing page, autenticação, navegação principal, manifesto e metadados usam a marca ReplyFlow.
+- Superfícies redesenhadas usam pt-BR e foram verificadas em desktop e celular.
+- Termos, privacidade e exclusão de dados receberam uma primeira adaptação textual; ainda precisam de revisão jurídica antes da produção.
+- Configuração central de produto e títulos do painel adicionada com testes automatizados.
 
 ## Marco 2 — SaaS multiempresa
 
@@ -147,6 +155,6 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 
 1. Tornar o repositório privado antes de iniciar código proprietário.
 2. Definir a estratégia para os alertas altos bloqueados por Auth.js e Prisma.
-3. Adicionar testes integrados com PostgreSQL e Redis.
-4. Criar a arquitetura de internacionalização e iniciar o rebranding.
+3. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
+4. Adicionar testes integrados com PostgreSQL e Redis.
 5. Implementar workspace ativo antes de contatos e cobrança.

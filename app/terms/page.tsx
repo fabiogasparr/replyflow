@@ -2,52 +2,51 @@ import type { Metadata } from "next";
 import LegalShell from "@/components/legal-shell";
 
 export const metadata: Metadata = {
-  title: "Terms of Service - OpenReply",
-  description:
-    "Terms for using OpenReply's Instagram comment-to-DM campaign software.",
+  title: "Termos de Uso",
+  description: "Termos para uso das automações de comentários e mensagens do ReplyFlow.",
 };
 
 export default function TermsPage() {
   return (
     <LegalShell
-      title="Terms of Service"
-      description="These terms define acceptable use for OpenReply's hosted Instagram comment-to-DM campaign service."
-      updatedAt="May 24, 2026"
+      title="Termos de Uso"
+      description="Estes termos definem o uso aceitável do serviço de automação de comentários e mensagens do ReplyFlow."
+      updatedAt="4 de setembro de 2026"
     >
       <section>
-        <h2 className="text-xl font-bold text-white">Authorized Use</h2>
+        <h2 className="text-xl font-bold text-foreground">Uso autorizado</h2>
         <p className="mt-3">
-          You may use OpenReply only with Instagram professional accounts you
-          own or are authorized to manage. You are responsible for the campaigns,
-          keywords, links, and messages you configure.
+          Você pode usar o ReplyFlow somente com contas profissionais do Instagram
+          que possui ou está autorizado a gerenciar. Você é responsável pelas campanhas,
+          palavras-chave, links e mensagens que configurar.
         </p>
       </section>
 
       <section>
-        <h2 className="text-xl font-bold text-white">Platform Compliance</h2>
+        <h2 className="text-xl font-bold text-foreground">Conformidade com a plataforma</h2>
         <p className="mt-3">
-          You agree to follow Meta Platform Terms, Instagram policies, applicable
-          messaging rules, privacy laws, advertising rules, and anti-spam laws.
-          OpenReply may rate-limit, pause, or disable campaigns that create
-          compliance, abuse, security, or deliverability risk.
+          Você concorda em seguir os Termos da Plataforma Meta, as políticas do
+          Instagram, regras de mensagens, leis de privacidade, publicidade e combate
+          a spam aplicáveis. O ReplyFlow pode limitar, pausar ou desativar campanhas
+          que criem riscos de conformidade, abuso, segurança ou entrega.
         </p>
       </section>
 
       <section>
-        <h2 className="text-xl font-bold text-white">Availability</h2>
+        <h2 className="text-xl font-bold text-foreground">Disponibilidade</h2>
         <p className="mt-3">
-          OpenReply depends on third-party platforms including Meta, email,
-          hosting, database, and queue providers. We work to operate the
-          service reliably, but uninterrupted availability is not guaranteed.
+          O ReplyFlow depende de plataformas de terceiros, incluindo Meta e provedores
+          de e-mail, hospedagem, banco de dados e filas. Trabalhamos para operar o
+          serviço com confiabilidade, mas não garantimos disponibilidade ininterrupta.
         </p>
       </section>
 
       <section>
-        <h2 className="text-xl font-bold text-white">Open-Source Core</h2>
+        <h2 className="text-xl font-bold text-foreground">Núcleo de código aberto</h2>
         <p className="mt-3">
-          The public repository is MIT licensed. Hosted SaaS infrastructure,
-          managed support, agency workflows, analytics, reports, and other paid
-          service features may be provided separately from the open-source core.
+          O repositório público usa a licença MIT. A infraestrutura SaaS hospedada,
+          suporte gerenciado, fluxos para agências, análises, relatórios e outros
+          serviços pagos podem ser fornecidos separadamente do núcleo aberto.
         </p>
       </section>
     </LegalShell>

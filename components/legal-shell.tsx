@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BrandMark from "@/components/brand-mark";
 
 interface LegalShellProps {
   title: string;
@@ -17,23 +18,21 @@ export default function LegalShell({
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
-          <Link href="/" className="flex items-center gap-3">
-            <span className="text-lg font-bold text-foreground">OpenReply</span>
-          </Link>
+          <BrandMark />
           <Link
             href="/login"
             className="text-sm font-semibold text-muted transition hover:text-foreground"
           >
-            Sign in
+            Entrar
           </Link>
         </div>
       </header>
 
       <article className="mx-auto max-w-3xl px-5 py-14">
         <p className="text-sm font-semibold uppercase text-accent">
-          Last updated {updatedAt}
+          Última atualização: {updatedAt}
         </p>
-        <h1 className="mt-4 text-4xl font-black text-foreground sm:text-5xl">
+        <h1 className="font-display mt-4 text-4xl font-bold tracking-[-0.04em] text-foreground sm:text-5xl">
           {title}
         </h1>
         <p className="mt-5 text-base leading-8 text-muted">{description}</p>

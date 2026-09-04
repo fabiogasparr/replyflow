@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Comment LINK Automation for Instagram",
     description:
-      "Turn LINK, SHOP, GUIDE, and PRICE comments into tracked private replies with OpenReply.",
+      "Turn LINK, SHOP, GUIDE, and PRICE comments into tracked private replies with ReplyFlow.",
     url: "/comment-link-automation",
   },
 };
@@ -18,4 +18,3 @@ export const metadata: Metadata = {
 export default function CommentLinkAutomationPage() {
   return <SeoPageShell config={commentLinkSeoPage} />;
 }
-

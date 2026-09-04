@@ -11,6 +11,10 @@ import {
 } from "@/lib/meta/oauth";
 import { canManageInstagram } from "@/lib/workspace-access";
 import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
+import {
+  assertWorkspacePlanCapacity,
+  WorkspacePlanLimitError,
+} from "@/lib/billing/plans";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -62,8 +66,14 @@ export async function GET(request: NextRequest) {
     });
 
     if (!connection.allowed) {
+      const status =
+        connection.reason === "plan_limit"
+          ? "plan_limit"
+          : connection.reason === "already_connected"
+            ? "already_connected"
+            : "failed";
       return NextResponse.redirect(
-        `${baseUrl}/settings?instagram=already_connected`
+        `${baseUrl}/settings?instagram=${status}`
       );
     }
 
@@ -110,6 +120,24 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      if (!existingAccount) {
+        const workspace = await transaction.workspace.findUnique({
+          where: { id: state.workspaceId },
+          select: {
+            plan: true,
+            _count: { select: { instagramAccounts: true } },
+          },
+        });
+        if (!workspace) {
+          throw new Error("Workspace not found during Instagram connection");
+        }
+        assertWorkspacePlanCapacity(
+          workspace.plan,
+          "instagramAccounts",
+          workspace._count.instagramAccounts
+        );
+      }
+
       const account = existingAccount
         ? await transaction.instagramAccount.update({
             where: { id: existingAccount.id, workspaceId: state.workspaceId },
@@ -145,10 +173,14 @@ export async function GET(request: NextRequest) {
           },
         }),
       });
-    });
+    }, { isolationLevel: "Serializable" });
 
     return NextResponse.redirect(`${baseUrl}/dashboard?connected=true`);
   } catch (err) {
+    if (err instanceof WorkspacePlanLimitError) {
+      return NextResponse.redirect(`${baseUrl}/settings?instagram=plan_limit`);
+    }
+
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[Instagram Callback] Error:", err);
     // The message is the only diagnostic a self-hoster gets for a failed

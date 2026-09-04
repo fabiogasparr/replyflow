@@ -6,6 +6,7 @@ import {
   normalizeTopKeywords,
   summarizeDmStatuses,
 } from "@/lib/tracking/analytics";
+import { getWorkspacePlanDetails } from "@/lib/billing/plans";
 
 export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
       where: { id: workspaceId },
       select: {
         name: true,
+        plan: true,
         dmsSentThisPeriod: true,
       },
     }),
@@ -194,7 +196,13 @@ export async function GET(request: NextRequest) {
     data: {
       userName: firstName,
       contactsCount: contactRows.length,
-      workspace,
+      workspace: workspace
+        ? {
+            ...workspace,
+            planLabel: getWorkspacePlanDetails(workspace.plan).label,
+            limits: getWorkspacePlanDetails(workspace.plan).limits,
+          }
+        : null,
       instagramAccount,
       instagramAccounts,
       selectedInstagramAccountId: selectedAccountId,

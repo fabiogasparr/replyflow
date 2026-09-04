@@ -72,7 +72,7 @@ Objetivo: permitir que empresas e agências operem com isolamento e segurança.
 - [x] Melhorar convites, expiração, renovação e revogação.
 - [x] Adicionar trilha de auditoria administrativa.
 - [x] Revisar todas as queries para isolamento por workspace.
-- [ ] Definir limites de contas do Instagram e membros por plano.
+- [x] Definir limites de contas do Instagram e membros por plano.
 
 Critério de saída: uma agência administra vários clientes sem risco de acesso cruzado.
 
@@ -91,6 +91,8 @@ Progresso validado em 4 de setembro de 2026:
 - Somente proprietários e administradores consultam os 50 eventos mais recentes; tokens e conteúdo de conversas não são armazenados nos eventos.
 - Consultas autenticadas e mutações sensíveis foram revisadas para repetir o filtro de workspace; alertas Redis do worker agora são isolados antes de chegar ao diagnóstico.
 - Entradas públicas por capacidade e processos globais estão classificados em `docs/WORKSPACE_ISOLATION.md`, com invariantes e gate de verificação.
+- Planos Free, Pro e Agência centralizam capacidades progressivas de contas do Instagram e assentos; API, OAuth e interface aplicam os mesmos limites.
+- Reconexões e renovações não consomem uma nova vaga, enquanto convites pendentes reservam assentos para impedir excesso posterior.
 
 ## Marco 3 — Automação MVP
 
@@ -170,7 +172,7 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 ## Próxima execução recomendada
 
 1. Tornar o repositório privado antes de iniciar código proprietário.
-2. Definir limites de contas do Instagram e integrantes por plano.
-3. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
-4. Evoluir contatos e inbox sobre a base multiempresa já validada.
-5. Adicionar cobrança recorrente e enforcement de uso por plano.
+2. Criar a infraestrutura de internacionalização e concluir a tradução do painel.
+3. Evoluir contatos e inbox sobre a base multiempresa já validada.
+4. Adicionar cobrança recorrente e enforcement de uso por plano.
+5. Criar o painel administrativo global de clientes, planos e uso.

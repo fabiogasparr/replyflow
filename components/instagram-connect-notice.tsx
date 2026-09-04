@@ -35,6 +35,12 @@ const MESSAGES: Record<string, { tone: Tone; title: string; detail: string }> = 
     detail:
       "Essa conta do Instagram pertence a outro espaço. Desconecte-a primeiro ou use outra conta.",
   },
+  plan_limit: {
+    tone: "warning",
+    title: "Limite de contas atingido",
+    detail:
+      "Este espaço já usa todas as contas do Instagram incluídas no plano atual.",
+  },
 };
 
 export function InstagramConnectNotice() {

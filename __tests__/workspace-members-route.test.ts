@@ -8,6 +8,7 @@ const { getCurrentWorkspaceContext, mockPrisma } = vi.hoisted(() => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      count: vi.fn(),
       upsert: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -16,11 +17,13 @@ const { getCurrentWorkspaceContext, mockPrisma } = vi.hoisted(() => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      count: vi.fn(),
       upsert: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
     },
     user: { findUnique: vi.fn() },
+    workspace: { findUnique: vi.fn() },
     auditEvent: { create: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -61,6 +64,9 @@ beforeEach(() => {
   mockPrisma.workspaceMember.findMany.mockResolvedValue([]);
   mockPrisma.workspaceInvitation.findMany.mockResolvedValue([]);
   mockPrisma.workspaceInvitation.findUnique.mockResolvedValue(null);
+  mockPrisma.workspaceMember.count.mockResolvedValue(1);
+  mockPrisma.workspaceInvitation.count.mockResolvedValue(0);
+  mockPrisma.workspace.findUnique.mockResolvedValue({ plan: "FREE" });
   mockPrisma.auditEvent.create.mockResolvedValue({});
   mockPrisma.$transaction.mockImplementation(
     async (callback: (client: typeof mockPrisma) => unknown) =>
@@ -132,6 +138,11 @@ describe("workspace member authorization", () => {
   it("renews a pending invitation with a fresh token and expiry", async () => {
     getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
     mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: "invitation_1",
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
     mockPrisma.workspaceInvitation.upsert.mockResolvedValue({
       id: "invitation_1",
     });
@@ -160,6 +171,51 @@ describe("workspace member authorization", () => {
         token: expect.any(String),
         expiresAt: expect.any(Date),
       }),
+    });
+    expect(mockPrisma.workspaceMember.count).not.toHaveBeenCalled();
+    expect(mockPrisma.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "INVITATION_RENEWED" }),
+    });
+  });
+
+  it("blocks a new invitation when all plan seats are reserved", async () => {
+    getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.workspaceMember.count.mockResolvedValue(2);
+
+    const response = await POST(
+      request("POST", { email: "nova@example.com", role: "MEMBER" })
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      code: "PLAN_LIMIT_REACHED",
+      data: { resource: "members", limit: 2 },
+    });
+    expect(mockPrisma.workspaceInvitation.upsert).not.toHaveBeenCalled();
+  });
+
+  it("converts a reserved invitation without consuming another seat", async () => {
+    getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user_invited" });
+    mockPrisma.workspaceMember.findUnique.mockResolvedValue(null);
+    mockPrisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: "invitation_1",
+      status: "PENDING",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    mockPrisma.workspaceMember.count.mockResolvedValue(2);
+
+    const response = await POST(
+      request("POST", { email: "pessoa@example.com", role: "MEMBER" })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.workspaceMember.count).not.toHaveBeenCalled();
+    expect(mockPrisma.workspaceInvitation.update).toHaveBeenCalledWith({
+      where: { id: "invitation_1", workspaceId: "workspace_1" },
+      data: { status: "ACCEPTED", acceptedAt: expect.any(Date) },
     });
   });
 

@@ -70,13 +70,14 @@ model VerificationToken {
 }
 
 model Workspace {
-  id         String    @id @default(cuid())
+  id         String        @id @default(cuid())
   name       String
   ownerId    String
-  owner      User      @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  owner      User          @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
   archivedAt DateTime?
+  plan       WorkspacePlan @default(FREE)
 
   usagePeriodStart  DateTime @default(now())
   dmsSentThisPeriod Int      @default(0)
@@ -376,6 +377,12 @@ enum WorkspaceRole {
   OWNER
   ADMIN
   MEMBER
+}
+
+enum WorkspacePlan {
+  FREE
+  PRO
+  AGENCY
 }
 
 enum WorkspaceInvitationStatus {

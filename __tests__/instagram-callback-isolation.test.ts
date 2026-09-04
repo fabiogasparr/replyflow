@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   subscribeInstagramAccountToWebhooks: vi.fn(),
   transaction: {
     workspaceMember: { findUnique: vi.fn() },
+    workspace: { findUnique: vi.fn() },
     instagramAccount: {
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -65,6 +66,10 @@ beforeEach(() => {
   });
   mocks.subscribeInstagramAccountToWebhooks.mockResolvedValue({ success: true });
   mocks.transaction.workspaceMember.findUnique.mockResolvedValue({ role: "ADMIN" });
+  mocks.transaction.workspace.findUnique.mockResolvedValue({
+    plan: "PRO",
+    _count: { instagramAccounts: 0 },
+  });
   mocks.prisma.$transaction.mockImplementation(
     async (callback: (transaction: typeof mocks.transaction) => unknown) =>
       callback(mocks.transaction)
@@ -122,5 +127,21 @@ describe("Instagram callback workspace isolation", () => {
         action: "INSTAGRAM_CONNECTED",
       }),
     });
+  });
+
+  it("rechecks plan capacity inside the connection transaction", async () => {
+    mocks.transaction.instagramAccount.findUnique.mockResolvedValue(null);
+    mocks.transaction.workspace.findUnique.mockResolvedValue({
+      plan: "FREE",
+      _count: { instagramAccounts: 1 },
+    });
+
+    const response = await GET(callbackRequest());
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/settings?instagram=plan_limit"
+    );
+    expect(mocks.transaction.instagramAccount.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.operationalEvent.create).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,12 @@ import WorkspaceAuditLog from "@/components/workspace-audit-log";
 interface SettingsData {
   workspace: {
     name: string;
+    plan: "FREE" | "PRO" | "AGENCY";
+    planLabel: string;
+    limits: {
+      instagramAccounts: number;
+      members: number;
+    };
     dmsSentThisPeriod: number;
   };
   instagramAccount: {
@@ -197,6 +203,13 @@ export default function SettingsPage() {
   const canManageMembers =
     membersData?.currentUserRole === "OWNER" ||
     membersData?.currentUserRole === "ADMIN";
+  const accountLimit = data?.workspace.limits.instagramAccounts ?? 1;
+  const accountLimitReached = accounts.length >= accountLimit;
+  const memberLimit = data?.workspace.limits.members ?? 2;
+  const reservedSeats =
+    (membersData?.members.length ?? 0) +
+    (membersData?.invitations.length ?? 0);
+  const memberLimitReached = reservedSeats >= memberLimit;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -233,7 +246,8 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm font-medium text-foreground">Contas</p>
               <p className="text-xs text-muted mt-0.5">
-                {accounts.length} {accounts.length === 1 ? "perfil conectado" : "perfis conectados"}
+                {accounts.length} de {accountLimit}{" "}
+                {accountLimit === 1 ? "perfil incluído" : "perfis incluídos"}
               </p>
             </div>
             <span className="text-sm text-muted">
@@ -279,12 +293,18 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-6 pt-4 border-t border-border flex gap-3">
-          <a
-            href="/api/instagram/connect"
-            className="px-4 py-2 rounded text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
-          >
-            {accounts.length > 0 ? "Conectar outra conta" : "Conectar Instagram"}
-          </a>
+          {accountLimitReached ? (
+            <span className="rounded border border-warning/20 bg-warning/10 px-4 py-2 text-sm font-medium text-warning">
+              Limite do plano atingido
+            </span>
+          ) : (
+            <a
+              href="/api/instagram/connect"
+              className="px-4 py-2 rounded text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
+            >
+              {accounts.length > 0 ? "Conectar outra conta" : "Conectar Instagram"}
+            </a>
+          )}
         </div>
       </section>
 
@@ -294,7 +314,8 @@ export default function SettingsPage() {
         <h2 className="mb-1 text-base font-semibold">Equipe</h2>
         <p className="mb-6 text-xs leading-5 text-muted">
           Proprietários controlam tudo; administradores operam contas e automações;
-          membros acompanham resultados e respondem conversas.
+          membros acompanham resultados e respondem conversas. {reservedSeats} de{" "}
+          {memberLimit} assentos estão reservados no plano {data?.workspace.planLabel}.
         </p>
         <div className="space-y-3">
           {membersData?.members.map((member) => {
@@ -425,6 +446,7 @@ export default function SettingsPage() {
               placeholder="pessoa@empresa.com.br"
               className="rounded border border-border bg-surface px-4 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent/40"
               required
+              disabled={memberLimitReached}
             />
             <select
               value={inviteRole}
@@ -432,6 +454,7 @@ export default function SettingsPage() {
                 setInviteRole(event.target.value as "ADMIN" | "MEMBER")
               }
               className="rounded border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent/40"
+              disabled={memberLimitReached}
             >
               <option value="MEMBER">Membro</option>
               {membersData.currentUserRole === "OWNER" && (
@@ -440,10 +463,14 @@ export default function SettingsPage() {
             </select>
             <button
               type="submit"
-              disabled={busy === "invite"}
+              disabled={busy === "invite" || memberLimitReached}
               className="rounded bg-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
-              {busy === "invite" ? "Convidando..." : "Convidar"}
+              {busy === "invite"
+                ? "Convidando..."
+                : memberLimitReached
+                  ? "Limite atingido"
+                  : "Convidar"}
             </button>
             {memberError && (
               <p className="sm:col-span-3 text-sm text-error">{memberError}</p>
@@ -456,6 +483,17 @@ export default function SettingsPage() {
 
       <section className="panel rounded p-4 sm:p-6">
         <h2 className="mb-6 text-base font-semibold">Uso</h2>
+        <div className="flex items-center justify-between gap-3 border-b border-border py-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Plano atual</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Define a capacidade de contas e integrantes deste espaço.
+            </p>
+          </div>
+          <span className="rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-sm font-semibold text-accent">
+            {data?.workspace.planLabel ?? "Free"}
+          </span>
+        </div>
         <div className="flex items-center justify-between gap-3 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">

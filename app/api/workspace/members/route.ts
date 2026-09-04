@@ -14,6 +14,11 @@ import {
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
 import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
+import type { Prisma } from "@/app/generated/prisma/client";
+import {
+  assertWorkspacePlanCapacity,
+  WorkspacePlanLimitError,
+} from "@/lib/billing/plans";
 
 const inviteSchema = z.object({
   email: z.string().trim().email(),
@@ -29,6 +34,45 @@ const deleteSchema = z.object({
   memberId: z.string().min(1).optional(),
   invitationId: z.string().min(1).optional(),
 });
+
+async function assertMemberCapacity(
+  transaction: Prisma.TransactionClient,
+  workspaceId: string
+) {
+  const [workspace, memberCount, pendingInvitationCount] = await Promise.all([
+    transaction.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { plan: true },
+    }),
+    transaction.workspaceMember.count({ where: { workspaceId } }),
+    transaction.workspaceInvitation.count({
+      where: {
+        workspaceId,
+        status: "PENDING",
+        expiresAt: { gt: new Date() },
+      },
+    }),
+  ]);
+
+  if (!workspace) throw new Error("Workspace not found while checking plan");
+  assertWorkspacePlanCapacity(
+    workspace.plan,
+    "members",
+    memberCount + pendingInvitationCount
+  );
+}
+
+function memberPlanLimitResponse(error: WorkspacePlanLimitError) {
+  return NextResponse.json(
+    {
+      success: false,
+      code: error.code,
+      error: `Seu plano permite até ${error.limit} integrantes e convites ativos.`,
+      data: { resource: error.resource, limit: error.limit },
+    },
+    { status: 409 }
+  );
+}
 
 async function getMemberPayload(
   workspaceId: string,
@@ -156,6 +200,14 @@ export async function POST(request: NextRequest) {
     where: { email },
     select: { id: true },
   });
+  const existingInvitation = await prisma.workspaceInvitation.findUnique({
+    where: {
+      workspaceId_email: { workspaceId: context.workspaceId, email },
+    },
+  });
+  const invitationUsesSeat =
+    existingInvitation?.status === "PENDING" &&
+    existingInvitation.expiresAt > new Date();
 
   if (existingUser) {
     const existingMembership = await prisma.workspaceMember.findUnique({
@@ -176,84 +228,108 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await prisma.$transaction(async (transaction) => {
-      await transaction.workspaceMember.upsert({
-        where: {
-          workspaceId_userId: {
+    try {
+      await prisma.$transaction(async (transaction) => {
+        if (!existingMembership && !invitationUsesSeat) {
+          await assertMemberCapacity(transaction, context.workspaceId);
+        }
+        await transaction.workspaceMember.upsert({
+          where: {
+            workspaceId_userId: {
+              workspaceId: context.workspaceId,
+              userId: existingUser.id,
+            },
+          },
+          create: {
             workspaceId: context.workspaceId,
             userId: existingUser.id,
-          },
-        },
-        create: {
-          workspaceId: context.workspaceId,
-          userId: existingUser.id,
-          role: parsed.data.role,
-        },
-        update: {
-          role: parsed.data.role,
-        },
-      });
-      await transaction.auditEvent.create({
-        data: createAuditEventData({
-          workspaceId: context.workspaceId,
-          actorUserId: context.userId,
-          action: existingMembership
-            ? AUDIT_ACTIONS.memberRoleChanged
-            : AUDIT_ACTIONS.memberAdded,
-          targetType: "User",
-          targetId: existingUser.id,
-          metadata: {
-            ...(existingMembership
-              ? { previousRole: existingMembership.role }
-              : {}),
             role: parsed.data.role,
           },
-        }),
-      });
-    });
+          update: {
+            role: parsed.data.role,
+          },
+        });
+        if (existingInvitation?.status === "PENDING") {
+          await transaction.workspaceInvitation.update({
+            where: {
+              id: existingInvitation.id,
+              workspaceId: context.workspaceId,
+            },
+            data: { status: "ACCEPTED", acceptedAt: new Date() },
+          });
+        }
+        await transaction.auditEvent.create({
+          data: createAuditEventData({
+            workspaceId: context.workspaceId,
+            actorUserId: context.userId,
+            action: existingMembership
+              ? AUDIT_ACTIONS.memberRoleChanged
+              : AUDIT_ACTIONS.memberAdded,
+            targetType: "User",
+            targetId: existingUser.id,
+            metadata: {
+              ...(existingMembership
+                ? { previousRole: existingMembership.role }
+                : {}),
+              role: parsed.data.role,
+            },
+          }),
+        });
+      }, { isolationLevel: "Serializable" });
+    } catch (error) {
+      if (error instanceof WorkspacePlanLimitError) {
+        return memberPlanLimitResponse(error);
+      }
+      throw error;
+    }
   } else {
-    const existingInvitation = await prisma.workspaceInvitation.findUnique({
-      where: {
-        workspaceId_email: { workspaceId: context.workspaceId, email },
-      },
-    });
-    await prisma.$transaction(async (transaction) => {
-      const invitation = await transaction.workspaceInvitation.upsert({
-        where: {
-          workspaceId_email: {
+    try {
+      await prisma.$transaction(async (transaction) => {
+        if (!invitationUsesSeat) {
+          await assertMemberCapacity(transaction, context.workspaceId);
+        }
+        const invitation = await transaction.workspaceInvitation.upsert({
+          where: {
+            workspaceId_email: {
+              workspaceId: context.workspaceId,
+              email,
+            },
+          },
+          create: {
             workspaceId: context.workspaceId,
             email,
+            role: parsed.data.role,
+            token: generateInvitationToken(),
+            invitedByUserId: context.userId,
+            expiresAt: getInvitationExpiry(),
           },
-        },
-        create: {
-          workspaceId: context.workspaceId,
-          email,
-          role: parsed.data.role,
-          token: generateInvitationToken(),
-          invitedByUserId: context.userId,
-          expiresAt: getInvitationExpiry(),
-        },
-        update: {
-          role: parsed.data.role,
-          status: "PENDING",
-          token: generateInvitationToken(),
-          invitedByUserId: context.userId,
-          expiresAt: getInvitationExpiry(),
-        },
-      });
-      await transaction.auditEvent.create({
-        data: createAuditEventData({
-          workspaceId: context.workspaceId,
-          actorUserId: context.userId,
-          action: existingInvitation
-            ? AUDIT_ACTIONS.invitationRenewed
-            : AUDIT_ACTIONS.memberInvited,
-          targetType: "WorkspaceInvitation",
-          targetId: invitation.id,
-          metadata: { role: parsed.data.role },
-        }),
-      });
-    });
+          update: {
+            role: parsed.data.role,
+            status: "PENDING",
+            token: generateInvitationToken(),
+            invitedByUserId: context.userId,
+            expiresAt: getInvitationExpiry(),
+          },
+        });
+        await transaction.auditEvent.create({
+          data: createAuditEventData({
+            workspaceId: context.workspaceId,
+            actorUserId: context.userId,
+            action: existingInvitation
+              ? AUDIT_ACTIONS.invitationRenewed
+              : AUDIT_ACTIONS.memberInvited,
+            targetType: "WorkspaceInvitation",
+            targetId: invitation.id,
+            metadata: { role: parsed.data.role },
+          }),
+        });
+      }, { isolationLevel: "Serializable" });
+    } catch (error) {
+      if (error instanceof WorkspacePlanLimitError) {
+        return memberPlanLimitResponse(error);
+      }
+      throw error;
+    }
   }
 
   return NextResponse.json({

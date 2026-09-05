@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:poll": "WATCHPACK_POLLING=true next dev",
-    "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && next build --webpack",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
@@ -15,7 +15,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --configLoader runner",
     "test:contacts-db": "tsx scripts/test-contacts-db.ts",
-    "test:conversations-db": "tsx scripts/test-conversations-db.ts"
+    "test:conversations-db": "tsx scripts/test-conversations-db.ts",
+    "test:dm-retry-db": "tsx scripts/test-dm-retry-db.ts",
+    "test:dm-retry-queue": "tsx scripts/test-dm-retry-queue.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

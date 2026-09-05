@@ -26,6 +26,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -63,6 +72,16 @@ jobs:
         run: npm run test:conversations-db
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify safe DM retry migration
+        run: npm run test:dm-retry-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify manual retry idempotency with Redis
+        run: npm run test:dm-retry-queue
+        env:
+          TEST_REDIS_URL: redis://localhost:6379
 
       - name: Build
         run: npm run build

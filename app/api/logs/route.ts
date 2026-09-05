@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentWorkspaceId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { DmStatus } from "@/app/generated/prisma/client";
+import { getDmRetryEligibility } from "@/lib/dm-retry";
+import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
+import { canManageAutomations } from "@/lib/workspace-permissions";
+
+function positiveInteger(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 export async function GET(request: NextRequest) {
-  const workspaceId = await getCurrentWorkspaceId();
-  if (!workspaceId) {
+  const context = await getCurrentWorkspaceContext();
+  if (!context) {
     return NextResponse.json(
       { success: false, error: "Faça login para continuar" },
       { status: 401 }
@@ -13,11 +20,8 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const page = Math.max(1, Number.parseInt(searchParams.get("page") ?? "1", 10));
-  const limit = Math.min(
-    50,
-    Math.max(1, Number.parseInt(searchParams.get("limit") ?? "20", 10))
-  );
+  const page = positiveInteger(searchParams.get("page"), 1);
+  const limit = Math.min(50, positiveInteger(searchParams.get("limit"), 20));
   const status = searchParams.get("status");
   const instagramAccountId = searchParams.get("instagramAccountId");
   const skip = (page - 1) * limit;
@@ -27,7 +31,7 @@ export async function GET(request: NextRequest) {
       : null;
 
   const where = {
-    workspaceId,
+    workspaceId: context.workspaceId,
     ...(parsedStatus ? { status: parsedStatus } : {}),
     ...(instagramAccountId && instagramAccountId !== "all"
       ? { instagramAccountId }
@@ -41,8 +45,12 @@ export async function GET(request: NextRequest) {
       skip,
       take: limit,
       include: {
-        automation: { select: { name: true, keywords: true } },
-        instagramAccount: { select: { username: true } },
+        automation: {
+          select: { name: true, keywords: true, isActive: true },
+        },
+        instagramAccount: {
+          select: { username: true, instagramId: true },
+        },
       },
     }),
     prisma.dmLog.count({ where }),
@@ -51,7 +59,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     data: {
-      logs,
+      logs: logs.map((log) => ({
+        ...log,
+        retry: getDmRetryEligibility(log),
+      })),
+      canManageRetries: canManageAutomations(context.role),
       pagination: {
         page,
         limit,

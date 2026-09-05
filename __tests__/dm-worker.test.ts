@@ -26,6 +26,7 @@ const {
       findFirst: vi.fn(),
       upsert: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       create: vi.fn(),
     },
     instagramAccount: {
@@ -225,6 +226,7 @@ beforeEach(() => {
   );
   mockPrisma.dmLog.upsert.mockResolvedValue({});
   mockPrisma.dmLog.update.mockResolvedValue({});
+  mockPrisma.dmLog.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.instagramAccount.findUnique.mockResolvedValue({
     workspaceId: "workspace_123",
   });
@@ -388,6 +390,68 @@ describe("DM Worker — Full Pipeline", () => {
 
     expect(mockSendPrivateReply).not.toHaveBeenCalled();
     expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+  });
+
+  it("should not replay a failed comment after Meta delivery was attempted", async () => {
+    mockPrisma.dmLog.findUnique.mockResolvedValue({
+      id: "existing_log",
+      status: "FAILED",
+      deliveryAttemptedAt: new Date("2026-09-05T12:00:00Z"),
+    });
+    const processor = getProcessor();
+
+    await processor(createMockJob());
+
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+    expect(mockSendPrivateReply).not.toHaveBeenCalled();
+  });
+
+  it("should target only the campaign selected by a manual retry", async () => {
+    const processor = getProcessor();
+    await processor(
+      createMockJob({ ...mockJobData, automationId: "auto_789", source: "MANUAL" })
+    );
+
+    expect(mockPrisma.automation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "auto_789",
+          isActive: true,
+          instagramAccount: { instagramId: "ig_456" },
+        },
+      })
+    );
+    expect(mockPrisma.dmLog.update).toHaveBeenCalledWith({
+      where: {
+        automationId_commentId: {
+          automationId: "auto_789",
+          commentId: "comment_555",
+        },
+      },
+      data: { deliveryAttemptedAt: expect.any(Date) },
+    });
+  });
+
+  it("should restore a retryable failure when its targeted campaign was paused", async () => {
+    mockPrisma.automation.findMany.mockResolvedValue([]);
+    const processor = getProcessor();
+
+    await processor(
+      createMockJob({ ...mockJobData, automationId: "auto_789", source: "MANUAL" })
+    );
+
+    expect(mockPrisma.dmLog.updateMany).toHaveBeenCalledWith({
+      where: {
+        automationId: "auto_789",
+        commentId: "comment_555",
+        status: "PENDING",
+        deliveryAttemptedAt: null,
+      },
+      data: {
+        status: "FAILED",
+        errorMessage: "Automation is no longer active for this Instagram account",
+      },
+    });
   });
 
   it("should skip when monthly plan limit is reached", async () => {
@@ -1012,6 +1076,19 @@ describe("DM Worker — DM keyword trigger", () => {
 
   it("should not re-send when this message was already answered", async () => {
     mockPrisma.dmLog.findUnique.mockResolvedValue({ status: "SENT" });
+
+    const processor = getProcessor();
+    await processor(createMockMessageJob());
+
+    expect(mockSendDirectMessage).not.toHaveBeenCalled();
+    expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
+  });
+
+  it("should not replay an inbound DM after delivery was attempted", async () => {
+    mockPrisma.dmLog.findUnique.mockResolvedValue({
+      status: "FAILED",
+      deliveryAttemptedAt: new Date("2026-09-05T12:00:00Z"),
+    });
 
     const processor = getProcessor();
     await processor(createMockMessageJob());

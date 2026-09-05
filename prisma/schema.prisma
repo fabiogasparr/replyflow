@@ -311,6 +311,20 @@ model DmLog {
   dmSentAt       DateTime?
   errorMessage   String?
 
+  // Replay metadata is persisted with the log so an operator never has to
+  // reconstruct a queue job from mutable campaign state. deliveryAttemptedAt
+  // is the safety boundary: a FAILED row after this timestamp is intentionally
+  // not eligible for manual retry because Meta may have accepted the message
+  // even if the response was lost.
+  triggerType         DmTriggerType @default(COMMENT)
+  sourceEventId       String?
+  sourceMediaId       String?
+  originalMediaId     String?
+  source              String?
+  deliveryAttemptedAt DateTime?
+  manualRetryCount    Int           @default(0)
+  lastManualRetryAt   DateTime?
+
   // The public comment reply is delivered independently of the DM, so its
   // outcome is tracked separately. publicReplySentAt makes it idempotent across
   // retries; a DM failure never blocks or re-posts the public reply.
@@ -480,6 +494,12 @@ enum DmStatus {
   SKIPPED_RATE_LIMIT
   SKIPPED_PLAN_LIMIT
   SKIPPED_NO_MATCH
+}
+
+enum DmTriggerType {
+  COMMENT
+  MESSAGE
+  POSTBACK
 }
 
 enum WebhookStatus {

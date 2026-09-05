@@ -154,7 +154,7 @@ Lacunas:
 - Web e worker precisam compartilhar banco, Redis e chave de criptografia.
 - A maior parte dos testes não usa PostgreSQL, Redis ou Meta reais.
 - O módulo principal do worker possui responsabilidades demais.
-- Não existe fila de descarte formal e uma interface de reprocessamento de jobs com falha.
+- O módulo de envios agora oferece reprocessamento manual conservador para falhas anteriores à entrega; uma fila de descarte dedicada continua como evolução operacional.
 - O plano gratuito sugerido na documentação original pode não ser suficiente para operação comercial.
 - Alterações futuras do upstream podem conflitar com rebranding e mudanças profundas de domínio.
 

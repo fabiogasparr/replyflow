@@ -20,14 +20,19 @@ export function getRedisConnection(): Redis {
 
 // ─── DM Queue ───────────────────────────────────────────────────────────────────
 
-export type CommentSource = "WEBHOOK" | "POLLING";
+export type CommentSource = "WEBHOOK" | "POLLING" | "MANUAL";
 
 export interface ProcessCommentJob {
+  // Set by an operator retry to target exactly one campaign. Webhook/polling
+  // jobs intentionally leave it empty so normal matching still considers all
+  // active campaigns.
+  automationId?: string;
   instagramAccountId: string;
   commentId: string;
   commentText: string;
   commenterId: string;
   commenterName?: string;
+  matchedKeyword?: string | null;
   mediaId: string;
   // Set when the comment came from an ad: the organic post the ad was made
   // from. Campaigns are bound to that post, so both ids have to be matched.
@@ -60,10 +65,12 @@ export interface ProcessFollowUpJob {
 // An inbound DM from a user. Campaigns with `dmTriggerEnabled` whose keywords
 // match the text reply to the sender.
 export interface ProcessMessageJob {
+  automationId?: string;
   instagramAccountId: string;
   messageId: string;
   messageText: string;
   senderId: string;
+  matchedKeyword?: string | null;
 }
 
 export type DmQueueJob =

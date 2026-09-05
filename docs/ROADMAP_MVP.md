@@ -110,7 +110,7 @@ Objetivo: consolidar o principal caso de uso comercial.
 - [ ] Melhorar botões, links rastreáveis e follow-up.
 - [ ] Criar estados claros para pausado, ativo, com erro e aguardando publicação.
 - [ ] Dividir o worker em handlers menores.
-- [ ] Criar fila de falhas e reprocessamento manual seguro.
+- [x] Criar fila de falhas e reprocessamento manual seguro.
 - [ ] Exibir saúde do worker e atraso das filas no painel.
 - [ ] Testar idempotência, concorrência e limites com Redis real.
 

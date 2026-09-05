@@ -199,18 +199,30 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     originalMediaId,
   } = job.data;
   const requeueAttempt = job.data.requeueAttempt ?? 0;
+  const replayData = {
+    triggerType: "COMMENT" as const,
+    sourceEventId: commentId,
+    sourceMediaId: mediaId,
+    originalMediaId: originalMediaId ?? null,
+    source: job.data.source ?? null,
+  };
 
   const automations = await prisma.automation.findMany({
     where: {
+      ...(job.data.automationId ? { id: job.data.automationId } : {}),
       // Match campaigns bound to this specific post, plus any-post campaigns.
       // A comment left on an ad carries the ad's own media id, while the
       // campaign is bound to the post the ad was created from, so both ids
       // have to be considered or the comment is dropped without a trace.
-      OR: [
-        { postId: mediaId },
-        ...(originalMediaId ? [{ postId: originalMediaId }] : []),
-        { matchAnyPost: true },
-      ],
+      ...(job.data.automationId
+        ? {}
+        : {
+            OR: [
+              { postId: mediaId },
+              ...(originalMediaId ? [{ postId: originalMediaId }] : []),
+              { matchAnyPost: true },
+            ],
+          }),
       isActive: true,
       instagramAccount: {
         instagramId: instagramAccountId,
@@ -231,9 +243,27 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     orderBy: { createdAt: "asc" },
   });
 
+  if (job.data.automationId && automations.length === 0) {
+    await prisma.dmLog.updateMany({
+      where: {
+        automationId: job.data.automationId,
+        commentId,
+        status: "PENDING",
+        deliveryAttemptedAt: null,
+      },
+      data: {
+        status: "FAILED",
+        errorMessage: "Automation is no longer active for this Instagram account",
+      },
+    });
+    return;
+  }
+
   for (const automation of automations) {
     // "Any word" campaigns fire on every comment; otherwise require a keyword hit.
-    const matchResult = automation.matchAnyWord
+    const matchResult = job.data.automationId
+      ? { matched: true, matchedKeyword: job.data.matchedKeyword ?? null }
+      : automation.matchAnyWord
       ? { matched: true, matchedKeyword: null }
       : matchKeywords(
           commentText,
@@ -262,6 +292,15 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     // already sent but whose public reply never posted (e.g. it hit a rate
     // limit) must still come back so the public reply can be retried.
     if (existingLog?.status === "SKIPPED_PLAN_LIMIT") continue;
+    // A prior run reached the Meta delivery call but did not record SENT. Meta
+    // has no private-reply idempotency key, so replaying this ambiguous outcome
+    // could duplicate a DM. It remains FAILED for an operator to inspect.
+    if (
+      existingLog?.status === "FAILED" &&
+      existingLog.deliveryAttemptedAt
+    ) {
+      continue;
+    }
     if (alreadyDmd && (alreadyPublicReplied || !automation.publicReplyEnabled)) {
       continue;
     }
@@ -275,6 +314,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           },
         },
         create: {
+          ...replayData,
           workspaceId: automation.workspaceId,
           automationId: automation.id,
           instagramAccountId: automation.instagramAccountId,
@@ -287,6 +327,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           errorMessage: "No Instagram access token available",
         },
         update: {
+          ...replayData,
           status: "FAILED",
           errorMessage: "No Instagram access token available",
         },
@@ -306,6 +347,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           },
         },
         create: {
+          ...replayData,
           workspaceId: automation.workspaceId,
           automationId: automation.id,
           instagramAccountId: automation.instagramAccountId,
@@ -318,6 +360,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           errorMessage: "Failed to decrypt Instagram access token",
         },
         update: {
+          ...replayData,
           status: "FAILED",
           errorMessage: "Failed to decrypt Instagram access token",
         },
@@ -331,6 +374,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     if (!existingLog) {
       await prisma.dmLog.create({
         data: {
+          ...replayData,
           workspaceId: automation.workspaceId,
           automationId: automation.id,
           instagramAccountId: automation.instagramAccountId,
@@ -349,6 +393,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           automationId_commentId: { automationId: automation.id, commentId },
         },
         data: {
+          ...replayData,
           status: "PENDING",
           attempts: job.attemptsMade + 1,
           matchedKeyword: matchResult.matchedKeyword,
@@ -548,6 +593,16 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
       sendFollowPrompt = alreadyFollows !== true;
     }
 
+    // Persist this immediately before the first private-delivery call. If the
+    // process loses the Meta response, later BullMQ/manual retries stop here
+    // instead of risking the one private reply allowed for a comment.
+    await prisma.dmLog.update({
+      where: {
+        automationId_commentId: { automationId: automation.id, commentId },
+      },
+      data: { deliveryAttemptedAt: new Date() },
+    });
+
     try {
       if (useOpeningDm) {
         const openingText = renderMessageWithTracking({
@@ -718,6 +773,11 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   // Duplicate sends are enabled: every button tap re-sends the reveal
   // instead of only firing once per person.
   const dedupeId = `reveal:${userId}`;
+  const postbackReplayData = {
+    triggerType: "POSTBACK" as const,
+    sourceEventId: userId,
+    source: "WEBHOOK",
+  };
 
   if (fallback) {
     const existingReveal = await prisma.dmLog.findUnique({
@@ -787,6 +847,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         automationId_commentId: { automationId: automation.id, commentId: dedupeId },
       },
       create: {
+        ...postbackReplayData,
         workspaceId: automation.workspaceId,
         automationId: automation.id,
         instagramAccountId: automation.instagramAccountId,
@@ -797,7 +858,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         status: "SKIPPED_PLAN_LIMIT",
         errorMessage: `Monthly DM limit reached (${usage.limit})`,
       },
-      update: { status: "SKIPPED_PLAN_LIMIT" },
+      update: { ...postbackReplayData, status: "SKIPPED_PLAN_LIMIT" },
     });
     return;
   }
@@ -836,6 +897,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         automationId_commentId: { automationId: automation.id, commentId: dedupeId },
       },
       create: {
+        ...postbackReplayData,
         workspaceId: automation.workspaceId,
         automationId: automation.id,
         instagramAccountId: automation.instagramAccountId,
@@ -846,7 +908,12 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         status: "SENT",
         dmSentAt: new Date(),
       },
-      update: { status: "SENT", dmSentAt: new Date(), errorMessage: null },
+      update: {
+        ...postbackReplayData,
+        status: "SENT",
+        dmSentAt: new Date(),
+        errorMessage: null,
+      },
     });
   } catch (error) {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
@@ -871,6 +938,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         automationId_commentId: { automationId: automation.id, commentId: dedupeId },
       },
       create: {
+        ...postbackReplayData,
         workspaceId: automation.workspaceId,
         automationId: automation.id,
         instagramAccountId: automation.instagramAccountId,
@@ -881,7 +949,11 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         status: "FAILED",
         errorMessage: formatError(error),
       },
-      update: { status: "FAILED", errorMessage: formatError(error) },
+      update: {
+        ...postbackReplayData,
+        status: "FAILED",
+        errorMessage: formatError(error),
+      },
     });
     throw error;
   }
@@ -948,6 +1020,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
 
   const automations = await prisma.automation.findMany({
     where: {
+      ...(job.data.automationId ? { id: job.data.automationId } : {}),
       dmTriggerEnabled: true,
       isActive: true,
       instagramAccount: { instagramId: instagramAccountId },
@@ -965,8 +1038,26 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
 
   const dedupeId = `dm:${messageId}`;
 
+  if (job.data.automationId && automations.length === 0) {
+    await prisma.dmLog.updateMany({
+      where: {
+        automationId: job.data.automationId,
+        commentId: dedupeId,
+        status: "PENDING",
+        deliveryAttemptedAt: null,
+      },
+      data: {
+        status: "FAILED",
+        errorMessage: "Automation is no longer active for this Instagram account",
+      },
+    });
+    return;
+  }
+
   for (const automation of automations) {
-    const matchResult = automation.matchAnyWord
+    const matchResult = job.data.automationId
+      ? { matched: true, matchedKeyword: job.data.matchedKeyword ?? null }
+      : automation.matchAnyWord
       ? { matched: true, matchedKeyword: null }
       : matchKeywords(
           messageText,
@@ -993,6 +1084,12 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
     ) {
       continue;
     }
+    if (
+      existingLog?.status === "FAILED" &&
+      existingLog.deliveryAttemptedAt
+    ) {
+      continue;
+    }
 
     const logBase = {
       workspaceId: automation.workspaceId,
@@ -1002,6 +1099,9 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
       commentText: messageText,
       commentId: dedupeId,
       matchedKeyword: matchResult.matchedKeyword,
+      triggerType: "MESSAGE" as const,
+      sourceEventId: messageId,
+      source: "WEBHOOK",
     };
 
     if (!automation.instagramAccount.accessToken) {
@@ -1018,6 +1118,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: "No Instagram access token available",
         },
         update: {
+          ...logBase,
           status: "FAILED",
           errorMessage: "No Instagram access token available",
         },
@@ -1042,6 +1143,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: "Failed to decrypt Instagram access token",
         },
         update: {
+          ...logBase,
           status: "FAILED",
           errorMessage: "Failed to decrypt Instagram access token",
         },
@@ -1085,12 +1187,38 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: `Monthly DM limit reached (${usage.limit})`,
         },
         update: {
+          ...logBase,
           status: "SKIPPED_PLAN_LIMIT",
           errorMessage: `Monthly DM limit reached (${usage.limit})`,
         },
       });
       continue;
     }
+
+    const deliveryAttemptedAt = new Date();
+    await prisma.dmLog.upsert({
+      where: {
+        automationId_commentId: {
+          automationId: automation.id,
+          commentId: dedupeId,
+        },
+      },
+      create: {
+        ...logBase,
+        commenterName,
+        status: "PENDING",
+        attempts: job.attemptsMade + 1,
+        deliveryAttemptedAt,
+      },
+      update: {
+        ...logBase,
+        commenterName,
+        status: "PENDING",
+        attempts: job.attemptsMade + 1,
+        errorMessage: null,
+        deliveryAttemptedAt,
+      },
+    });
 
     try {
       if (sendFollowPrompt) {
@@ -1151,6 +1279,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           dmSentAt: new Date(),
         },
         update: {
+          ...logBase,
           status: "SENT",
           dmSentAt: new Date(),
           errorMessage: null,
@@ -1176,6 +1305,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: formatError(error),
         },
         update: {
+          ...logBase,
           status: "FAILED",
           attempts: job.attemptsMade + 1,
           errorMessage: formatError(error),

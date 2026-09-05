@@ -120,13 +120,13 @@ Critério de saída: campanhas processam eventos duplicados, falhas e rate limit
 
 Objetivo: transformar interações isoladas em relacionamento persistente.
 
-- [ ] Criar entidades `Contact`, `Conversation`, `Message`, `Tag` e `CustomField`. (`Contact` concluído.)
+- [ ] Criar entidades `Contact`, `Conversation`, `Message`, `Tag` e `CustomField`. (`Contact` e `Conversation` concluídos.)
 - [x] Migrar ou associar logs existentes aos contatos.
 - [ ] Criar perfil do contato com histórico de comentários, DMs e cliques. (Comentários e respostas de automação concluídos; cliques aguardam identificação do destinatário.)
 - [ ] Permitir tags manuais e automáticas. (Etiquetas manuais concluídas.)
 - [ ] Criar segmentos por origem, campanha, engajamento e data.
-- [ ] Evoluir o inbox com atribuição, status, busca e notas.
-- [ ] Aplicar a janela de mensagens da Meta na interface.
+- [x] Evoluir o inbox com atribuição, status, busca e notas.
+- [ ] Aplicar a janela de mensagens da Meta na interface. (Estimativa e aviso concluídos; regras especiais ainda dependem da resposta oficial da Meta.)
 - [ ] Implementar exportação e exclusão de dados pessoais.
 
 Critério de saída: a equipe consegue identificar um contato, acompanhar seu histórico e responder com contexto.
@@ -140,6 +140,12 @@ Progresso validado em 5 de setembro de 2026:
 - Edição concorrente retorna conflito e preserva o rascunho local para comparação com a versão mais recente.
 - O PostgreSQL foi validado com todas as 23 migrations, backfill, eventos fora de ordem, concorrência, cascata e rollback atômico em schema descartável.
 - Limitações e rollback operacional estão documentados em `docs/CONTACTS.md`.
+- O inbox sincroniza conversas da API oficial com estado operacional local: aberta, pendente, resolvida, prioridade, responsável e notas.
+- A busca e os filtros funcionam sobre nome, identificador, prévia, status, responsável e prioridade; o layout foi reorganizado para desktop e celular.
+- A janela padrão de atendimento é estimada pela última mensagem recebida, sem transformar a estimativa local em autorização de envio.
+- Mensagens completas permanecem na Meta; o PostgreSQL guarda somente a prévia mais recente e o estado de trabalho da equipe.
+- O isolamento de conversa, contato, conta e responsável foi validado após as 24 migrations reais em schema descartável.
+- Impacto, estratégia de falha e rollback estão documentados em `docs/CONVERSATIONS.md`.
 
 ## Marco 5 — Planos e cobrança
 

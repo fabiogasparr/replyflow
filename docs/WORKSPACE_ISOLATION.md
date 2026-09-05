@@ -5,11 +5,12 @@ O ReplyFlow trata o workspace ativo como a fronteira de autorização para todos
 ## Invariantes
 
 1. Rotas autenticadas resolvem o workspace pelo servidor com `getCurrentWorkspaceId` ou `getCurrentWorkspaceContext`.
-2. Leituras de automações, contatos, logs, contas do Instagram, métricas, equipe e auditoria incluem o `workspaceId` ativo.
+2. Leituras de automações, contatos, conversas, logs, contas do Instagram, métricas, equipe e auditoria incluem o `workspaceId` ativo.
 3. Alterações e exclusões repetem `workspaceId` no próprio `WHERE`, mesmo depois de uma leitura autorizada.
 4. IDs de contas do Instagram recebidos do cliente são resolvidos por `getWorkspaceInstagramAccount`, que exige a combinação conta + workspace.
 5. Alertas do worker carregam `workspaceId` e são filtrados antes de chegar ao diagnóstico. Alertas antigos sem escopo não são exibidos.
-6. Tokens, access tokens da Meta e conteúdo de mensagens não entram na trilha de auditoria.
+6. Tokens, access tokens da Meta, conteúdo de mensagens e anotações internas não entram na trilha de auditoria.
+7. Conversas repetem workspace + conta + contato nas chaves estrangeiras; responsáveis só podem ser integrantes do mesmo workspace.
 
 ## Entradas deliberadamente públicas
 
@@ -39,4 +40,4 @@ npm test
 npm run build -- --webpack
 ```
 
-Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria, contatos e filtragem de alertas do worker. O CRM também executa `npm run test:contacts-db` contra um schema PostgreSQL descartável para validar a chave estrangeira composta, o backfill e a ingestão concorrente.
+Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria, contatos, conversas e filtragem de alertas do worker. O CRM executa `npm run test:contacts-db` e `npm run test:conversations-db` contra schemas PostgreSQL descartáveis para validar chaves compostas, backfill, atribuição e ingestão concorrente.

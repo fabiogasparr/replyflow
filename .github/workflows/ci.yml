@@ -59,6 +59,11 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
 
+      - name: Verify conversation migration and database isolation
+        run: npm run test:conversations-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
       - name: Build
         run: npm run build
         env:

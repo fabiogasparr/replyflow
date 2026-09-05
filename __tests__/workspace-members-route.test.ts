@@ -25,6 +25,7 @@ const { getCurrentWorkspaceContext, mockPrisma } = vi.hoisted(() => ({
     user: { findUnique: vi.fn() },
     workspace: { findUnique: vi.fn() },
     auditEvent: { create: vi.fn() },
+    conversation: { updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -40,7 +41,7 @@ vi.mock("@/lib/workspace-access", () => ({
     (actor === "OWNER" || (actor === "ADMIN" && target === "MEMBER")),
 }));
 
-import { GET, PATCH, POST } from "@/app/api/workspace/members/route";
+import { DELETE, GET, PATCH, POST } from "@/app/api/workspace/members/route";
 
 function context(role: "OWNER" | "ADMIN" | "MEMBER") {
   return {
@@ -51,7 +52,7 @@ function context(role: "OWNER" | "ADMIN" | "MEMBER") {
   };
 }
 
-function request(method: "POST" | "PATCH", body: unknown) {
+function request(method: "POST" | "PATCH" | "DELETE", body: unknown) {
   return new NextRequest("http://localhost/api/workspace/members", {
     method,
     headers: { "Content-Type": "application/json" },
@@ -258,6 +259,30 @@ describe("workspace member authorization", () => {
         action: "MEMBER_ROLE_CHANGED",
         targetId: "user_other",
       }),
+    });
+  });
+
+  it("unassigns conversations before removing a workspace member", async () => {
+    getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
+    mockPrisma.workspaceMember.findFirst.mockResolvedValue({
+      id: "member_agent",
+      userId: "user_agent",
+      role: "MEMBER",
+    });
+    mockPrisma.conversation.updateMany.mockResolvedValue({ count: 2 });
+    mockPrisma.workspaceMember.delete.mockResolvedValue({});
+
+    const response = await DELETE(
+      request("DELETE", { memberId: "member_agent" })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.conversation.updateMany).toHaveBeenCalledWith({
+      where: { workspaceId: "workspace_1", assignedMemberId: "member_agent" },
+      data: { assignedMemberId: null, version: { increment: 1 } },
+    });
+    expect(mockPrisma.workspaceMember.delete).toHaveBeenCalledWith({
+      where: { id: "member_agent", workspaceId: "workspace_1" },
     });
   });
 });

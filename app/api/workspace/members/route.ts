@@ -444,6 +444,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     await prisma.$transaction(async (transaction) => {
+      await transaction.conversation.updateMany({
+        where: {
+          workspaceId: context.workspaceId,
+          assignedMemberId: member.id,
+        },
+        data: { assignedMemberId: null, version: { increment: 1 } },
+      });
       await transaction.workspaceMember.delete({
         where: { id: member.id, workspaceId: context.workspaceId },
       });

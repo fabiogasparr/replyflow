@@ -94,6 +94,7 @@ model Workspace {
   operationalEvents OperationalEvent[]
   auditEvents       AuditEvent[]
   contacts          Contact[]
+  conversations     Conversation[]
 
   @@index([ownerId])
   @@index([archivedAt])
@@ -106,10 +107,12 @@ model WorkspaceMember {
   role        WorkspaceRole @default(OWNER)
   createdAt   DateTime      @default(now())
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace             Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedConversations Conversation[] @relation("ConversationAssignee")
 
   @@unique([workspaceId, userId])
+  @@unique([id, workspaceId])
   @@index([userId])
 }
 
@@ -153,6 +156,7 @@ model InstagramAccount {
   linkClicks        LinkClick[]
   followerSnapshots FollowerSnapshot[]
   contacts          Contact[]
+  conversations     Conversation[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -161,27 +165,62 @@ model InstagramAccount {
 /// A person observed in automation logs, scoped to one workspace and account.
 /// Derived identity/name/dates are synchronized by the DmLog database trigger.
 model Contact {
-  id                  String    @id @default(cuid())
-  workspaceId         String
-  instagramAccountId  String
-  instagramScopedId   String
-  username            String?
-  usernameObservedAt  DateTime?
-  tags                String[]  @default([])
-  notes               String?
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  instagramAccountId String
+  instagramScopedId  String
+  username           String?
+  usernameObservedAt DateTime?
+  tags               String[]  @default([])
+  notes              String?
   /// Optimistic concurrency token changed only by manual edits.
-  version             Int       @default(0)
-  firstSeenAt         DateTime
-  lastSeenAt          DateTime
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  version            Int       @default(0)
+  firstSeenAt        DateTime
+  lastSeenAt         DateTime
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   instagramAccount InstagramAccount @relation(fields: [instagramAccountId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  conversations    Conversation[]
 
   @@unique([workspaceId, instagramAccountId, instagramScopedId], map: "Contact_workspace_account_scoped_key")
+  @@unique([id, workspaceId, instagramAccountId])
   @@index([workspaceId, lastSeenAt])
   @@index([workspaceId, instagramAccountId, lastSeenAt])
+}
+
+/// Team-owned state layered over a conversation fetched from Meta's official API.
+/// Message bodies remain at Meta; only operational metadata and the latest preview
+/// are stored locally.
+model Conversation {
+  id                 String               @id @default(cuid())
+  workspaceId        String
+  instagramAccountId String
+  contactId          String
+  metaConversationId String
+  status             ConversationStatus   @default(OPEN)
+  priority           ConversationPriority @default(NORMAL)
+  assignedMemberId   String?
+  notes              String?
+  version            Int                  @default(0)
+  lastMessageText    String?
+  lastMessageAt      DateTime?
+  lastMessageFromMe  Boolean?
+  lastInboundAt      DateTime?
+  lastSyncedAt       DateTime             @default(now())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instagramAccount InstagramAccount @relation(fields: [instagramAccountId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  contact          Contact          @relation(fields: [contactId, workspaceId, instagramAccountId], references: [id, workspaceId, instagramAccountId], onDelete: Cascade)
+  assignedMember   WorkspaceMember? @relation("ConversationAssignee", fields: [assignedMemberId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@unique([workspaceId, instagramAccountId, metaConversationId])
+  @@index([workspaceId, status, priority, lastMessageAt])
+  @@index([assignedMemberId])
+  @@index([contactId])
 }
 
 /// Daily follower total for one account. Instagram only retains ~30 days of
@@ -420,6 +459,17 @@ enum WorkspaceInvitationStatus {
   ACCEPTED
   REVOKED
   EXPIRED
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
+}
+
+enum ConversationPriority {
+  NORMAL
+  HIGH
 }
 
 enum DmStatus {

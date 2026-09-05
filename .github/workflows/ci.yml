@@ -29,12 +29,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - name: Install dependencies
@@ -56,6 +56,11 @@ jobs:
 
       - name: Verify contact migration and database isolation
         run: npm run test:contacts-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify conversation migration and database isolation
+        run: npm run test:conversations-db
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
 

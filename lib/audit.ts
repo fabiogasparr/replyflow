@@ -16,6 +16,8 @@ export const AUDIT_ACTIONS = {
   instagramConnected: "INSTAGRAM_CONNECTED",
   instagramDisconnected: "INSTAGRAM_DISCONNECTED",
   contactUpdated: "CONTACT_UPDATED",
+  conversationUpdated: "CONVERSATION_UPDATED",
+  conversationMessageSent: "CONVERSATION_MESSAGE_SENT",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

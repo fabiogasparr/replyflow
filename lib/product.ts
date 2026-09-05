@@ -10,6 +10,7 @@ export type DashboardNavKey =
   | "dashboard"
   | "overview"
   | "inbox"
+  | "contacts"
   | "campaigns"
   | "logs"
   | "settings"
@@ -23,6 +24,7 @@ export const DASHBOARD_NAV_ITEMS: ReadonlyArray<{
   { key: "dashboard", label: "Início", href: "/dashboard" },
   { key: "overview", label: "Desempenho", href: "/overview" },
   { key: "inbox", label: "Conversas", href: "/inbox" },
+  { key: "contacts", label: "Contatos", href: "/contacts" },
   { key: "campaigns", label: "Automações", href: "/campaigns" },
   { key: "logs", label: "Histórico de envios", href: "/logs" },
   { key: "settings", label: "Configurações", href: "/settings" },
@@ -36,6 +38,7 @@ const dashboardPageTitles: ReadonlyArray<[prefix: string, title: string]> = [
   ["/automations", "Automações"],
   ["/overview", "Desempenho"],
   ["/inbox", "Conversas"],
+  ["/contacts", "Contatos"],
   ["/logs", "Histórico de envios"],
   ["/settings", "Configurações"],
   ["/diagnostics", "Diagnóstico"],

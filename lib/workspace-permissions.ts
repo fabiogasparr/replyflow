@@ -12,6 +12,7 @@ export type WorkspacePermission =
   | "members:manage"
   | "instagram:manage"
   | "automations:manage"
+  | "contacts:manage"
   | "inbox:reply"
   | "reports:view"
   | "billing:manage";
@@ -26,6 +27,7 @@ const WORKSPACE_PERMISSIONS: Record<
     "members:manage",
     "instagram:manage",
     "automations:manage",
+    "contacts:manage",
     "inbox:reply",
     "reports:view",
     "billing:manage",
@@ -35,6 +37,7 @@ const WORKSPACE_PERMISSIONS: Record<
     "members:manage",
     "instagram:manage",
     "automations:manage",
+    "contacts:manage",
     "inbox:reply",
     "reports:view",
   ]),
@@ -65,6 +68,10 @@ export function canManageBilling(role: WorkspaceRole) {
 
 export function canManageAutomations(role: WorkspaceRole) {
   return hasWorkspacePermission(role, "automations:manage");
+}
+
+export function canManageContacts(role: WorkspaceRole) {
+  return hasWorkspacePermission(role, "contacts:manage");
 }
 
 export function canManageInstagram(role: WorkspaceRole) {

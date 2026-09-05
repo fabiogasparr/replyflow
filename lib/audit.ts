@@ -15,6 +15,7 @@ export const AUDIT_ACTIONS = {
   memberRemoved: "MEMBER_REMOVED",
   instagramConnected: "INSTAGRAM_CONNECTED",
   instagramDisconnected: "INSTAGRAM_DISCONNECTED",
+  contactUpdated: "CONTACT_UPDATED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

@@ -93,6 +93,7 @@ model Workspace {
   webhookEvents     WebhookEvent[]
   operationalEvents OperationalEvent[]
   auditEvents       AuditEvent[]
+  contacts          Contact[]
 
   @@index([ownerId])
   @@index([archivedAt])
@@ -151,8 +152,36 @@ model InstagramAccount {
   dmLogs            DmLog[]
   linkClicks        LinkClick[]
   followerSnapshots FollowerSnapshot[]
+  contacts          Contact[]
 
+  @@unique([id, workspaceId])
   @@index([workspaceId])
+}
+
+/// A person observed in automation logs, scoped to one workspace and account.
+/// Derived identity/name/dates are synchronized by the DmLog database trigger.
+model Contact {
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  instagramAccountId  String
+  instagramScopedId   String
+  username            String?
+  usernameObservedAt  DateTime?
+  tags                String[]  @default([])
+  notes               String?
+  /// Optimistic concurrency token changed only by manual edits.
+  version             Int       @default(0)
+  firstSeenAt         DateTime
+  lastSeenAt          DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instagramAccount InstagramAccount @relation(fields: [instagramAccountId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([workspaceId, instagramAccountId, instagramScopedId], map: "Contact_workspace_account_scoped_key")
+  @@index([workspaceId, lastSeenAt])
+  @@index([workspaceId, instagramAccountId, lastSeenAt])
 }
 
 /// Daily follower total for one account. Instagram only retains ~30 days of
@@ -257,6 +286,7 @@ model DmLog {
   instagramAccount InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
 
   @@unique([automationId, commentId])
+  @@index([workspaceId, instagramAccountId, commenterId, createdAt], map: "DmLog_contact_createdAt_idx")
   @@index([workspaceId])
   @@index([automationId])
   @@index([instagramAccountId])

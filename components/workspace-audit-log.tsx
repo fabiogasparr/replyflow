@@ -29,6 +29,7 @@ const actionLabels: Record<string, string> = {
   MEMBER_REMOVED: "removeu um integrante",
   INSTAGRAM_CONNECTED: "conectou uma conta do Instagram",
   INSTAGRAM_DISCONNECTED: "desconectou uma conta do Instagram",
+  CONTACT_UPDATED: "atualizou um contato",
 };
 
 export default function WorkspaceAuditLog() {

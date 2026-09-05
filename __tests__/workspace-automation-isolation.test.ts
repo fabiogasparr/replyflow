@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { getCurrentWorkspaceContext, prisma } = vi.hoisted(() => ({
+const { getCurrentWorkspaceContext, getCurrentWorkspaceId, prisma } = vi.hoisted(() => ({
   getCurrentWorkspaceContext: vi.fn(),
+  getCurrentWorkspaceId: vi.fn(),
   prisma: {
     automation: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
     },
+    dmLog: { groupBy: vi.fn() },
+    linkClick: { groupBy: vi.fn() },
     trackedLink: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
@@ -18,14 +22,14 @@ const { getCurrentWorkspaceContext, prisma } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentWorkspaceId: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ getCurrentWorkspaceId }));
 vi.mock("@/lib/db/client", () => ({ prisma }));
 vi.mock("@/lib/workspace-access", () => ({
   getCurrentWorkspaceContext,
   canManageAutomations: (role: string) => role === "OWNER" || role === "ADMIN",
 }));
 
-import { PATCH } from "@/app/api/automations/route";
+import { GET, PATCH } from "@/app/api/automations/route";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -34,6 +38,10 @@ beforeEach(() => {
     workspaceId: "workspace_1",
     role: "ADMIN",
   });
+  getCurrentWorkspaceId.mockResolvedValue("workspace_1");
+  prisma.automation.findMany.mockResolvedValue([]);
+  prisma.dmLog.groupBy.mockResolvedValue([]);
+  prisma.linkClick.groupBy.mockResolvedValue([]);
 });
 
 function updateRequest(id: string) {
@@ -45,6 +53,50 @@ function updateRequest(id: string) {
 }
 
 describe("automation workspace isolation", () => {
+  it("derives an error state on the server without exposing credentials", async () => {
+    prisma.automation.findMany.mockResolvedValueOnce([
+      {
+        id: "automation_1",
+        workspaceId: "workspace_1",
+        instagramAccountId: "account_1",
+        name: "Campanha",
+        isActive: true,
+        pendingNextReel: false,
+        postId: "media_1",
+        reportShareSlug: "report_1",
+        lastRunAt: null,
+        lastSuccessAt: null,
+        lastErrorAt: null,
+        lastErrorKind: null,
+        lastErrorMessage: null,
+        consecutiveFailures: 0,
+        instagramAccount: {
+          username: "empresa",
+          instagramId: "business_1",
+          tokenExpiresAt: new Date("2020-01-01T00:00:00Z"),
+        },
+        trackedLinks: [],
+        _count: { dmLogs: 0 },
+      },
+    ]);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/automations")
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(prisma.automation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { workspaceId: "workspace_1" } })
+    );
+    expect(payload.data[0].operationalState).toMatchObject({
+      state: "ERROR",
+      needsAttention: true,
+    });
+    expect(JSON.stringify(payload)).not.toContain("accessToken");
+    expect(JSON.stringify(payload)).not.toContain("lastErrorMessage");
+  });
+
   it("returns a client error for malformed JSON without touching the database", async () => {
     const request = new NextRequest("http://localhost/api/automations?id=automation_1", {
       method: "PATCH", headers: { "content-type": "application/json" }, body: "{",

@@ -15,6 +15,8 @@ const {
   mockQueueAdd,
   mockReserveWorkspaceDMSend,
   mockReleaseWorkspaceDMReservation,
+  mockRecordAutomationSuccess,
+  mockRecordAutomationFailure,
 } = vi.hoisted(() => ({
   mockPrisma: {
     automation: {
@@ -49,6 +51,8 @@ const {
   mockQueueAdd: vi.fn(),
   mockReserveWorkspaceDMSend: vi.fn(),
   mockReleaseWorkspaceDMReservation: vi.fn(),
+  mockRecordAutomationSuccess: vi.fn(),
+  mockRecordAutomationFailure: vi.fn(),
 }));
 
 vi.mock("@/lib/db/client", () => ({
@@ -104,6 +108,11 @@ vi.mock("@/lib/billing/usage", () => ({
 
 vi.mock("@/lib/ops/worker-health", () => ({
   recordWorkerAlert: vi.fn(),
+}));
+
+vi.mock("@/lib/automations/operational-state", () => ({
+  recordAutomationSuccess: mockRecordAutomationSuccess,
+  recordAutomationFailure: mockRecordAutomationFailure,
 }));
 
 vi.mock("@/lib/queue/client", () => ({
@@ -250,6 +259,8 @@ beforeEach(() => {
     reserved: true,
   });
   mockReleaseWorkspaceDMReservation.mockResolvedValue({ count: 1 });
+  mockRecordAutomationSuccess.mockResolvedValue(undefined);
+  mockRecordAutomationFailure.mockResolvedValue(undefined);
   mockSendPrivateReply.mockResolvedValue({
     recipient_id: "commenter_999",
     message_id: "msg_001",
@@ -348,6 +359,7 @@ describe("DM Worker — Full Pipeline", () => {
       "Hey commenter_user! Here is the link: https://example.com"
     );
     expect(mockReleaseWorkspaceDMReservation).not.toHaveBeenCalled();
+    expect(mockRecordAutomationSuccess).toHaveBeenCalledWith("auto_789");
     expect(mockPrisma.dmLog.update).toHaveBeenCalledWith({
       where: {
         automationId_commentId: {
@@ -556,6 +568,10 @@ describe("DM Worker — Full Pipeline", () => {
         errorMessage: "API Error",
       }),
     });
+    expect(mockRecordAutomationFailure).toHaveBeenCalledWith(
+      "auto_789",
+      error
+    );
   });
 
   it("should handle missing access token", async () => {
@@ -582,6 +598,12 @@ describe("DM Worker — Full Pipeline", () => {
     );
     expect(mockReserveWorkspaceDMSend).not.toHaveBeenCalled();
     expect(mockSendPrivateReply).not.toHaveBeenCalled();
+    expect(mockRecordAutomationFailure).toHaveBeenCalledWith(
+      "auto_789",
+      expect.objectContaining({
+        message: "No Instagram access token available",
+      })
+    );
   });
 
   it("should use 'there' when commenter name is not available", async () => {

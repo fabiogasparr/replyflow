@@ -281,6 +281,16 @@ model Automation {
   reportShareSlug         String?  @unique
   reportShareEnabled      Boolean  @default(true)
 
+  // Operational projection maintained by the worker. It is intentionally
+  // separate from isActive: an enabled campaign can still need attention when
+  // its credentials or most recent platform execution failed.
+  lastRunAt           DateTime?
+  lastSuccessAt       DateTime?
+  lastErrorAt         DateTime?
+  lastErrorKind       String?
+  lastErrorMessage    String?
+  consecutiveFailures Int       @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -293,6 +303,7 @@ model Automation {
   @@index([workspaceId])
   @@index([instagramAccountId])
   @@index([postId])
+  @@index([workspaceId, lastErrorAt])
 }
 
 model DmLog {

@@ -7,6 +7,7 @@ import { calculateCtr, normalizeTopKeywords } from "@/lib/tracking/analytics";
 import { buildTrackedUrl } from "@/lib/tracking/message";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import { buildReportUrl, generateReportShareSlug } from "@/lib/reports/share";
+import { deriveAutomationOperationalState } from "@/lib/automations/operational-state";
 import {
   canManageAutomations,
   getCurrentWorkspaceContext,
@@ -141,7 +142,7 @@ export async function GET(request: NextRequest) {
     where: { workspaceId, ...accountFilter },
     include: {
       instagramAccount: {
-        select: { username: true, instagramId: true },
+        select: { username: true, instagramId: true, tokenExpiresAt: true },
       },
       _count: {
         select: { dmLogs: true },
@@ -246,31 +247,35 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     {
-    success: true,
-    data: automationsWithReports.map((automation) => {
-      const item = analytics.get(automation.id) ?? {
-        sent: 0,
-        skipped: 0,
-        failed: 0,
-        clicks: 0,
-        topKeywords: [],
-      };
+      success: true,
+      data: automationsWithReports.map((automation) => {
+        const item = analytics.get(automation.id) ?? {
+          sent: 0,
+          skipped: 0,
+          failed: 0,
+          clicks: 0,
+          topKeywords: [],
+        };
 
-      return {
-        ...automation,
-        trackedLinks: automation.trackedLinks.map((link) => ({
-          ...link,
-          trackedUrl: buildTrackedUrl(link.slug),
-        })),
-        reportUrl: automation.reportShareSlug
-          ? buildReportUrl(automation.reportShareSlug)
-          : null,
-        analytics: {
-          ...item,
-          ctr: calculateCtr(item.clicks, item.sent),
-        },
-      };
-    }),
+        return {
+          ...automation,
+          // The dashboard receives a stable, translated summary instead of
+          // the provider diagnostic persisted for server-side investigation.
+          lastErrorMessage: undefined,
+          operationalState: deriveAutomationOperationalState(automation),
+          trackedLinks: automation.trackedLinks.map((link) => ({
+            ...link,
+            trackedUrl: buildTrackedUrl(link.slug),
+          })),
+          reportUrl: automation.reportShareSlug
+            ? buildReportUrl(automation.reportShareSlug)
+            : null,
+          analytics: {
+            ...item,
+            ctr: calculateCtr(item.clicks, item.sent),
+          },
+        };
+      }),
     },
     { headers: { "Cache-Control": "no-store" } }
   );

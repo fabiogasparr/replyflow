@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
       update: vi.fn(),
       create: vi.fn(),
     },
+    automation: { updateMany: vi.fn() },
     auditEvent: { create: vi.fn() },
   },
   prisma: {
@@ -120,6 +121,19 @@ describe("Instagram callback workspace isolation", () => {
     expect(mocks.transaction.instagramAccount.update).toHaveBeenCalledWith({
       where: { id: "account_1", workspaceId: "workspace_1" },
       data: expect.not.objectContaining({ workspaceId: expect.anything() }),
+    });
+    expect(mocks.transaction.automation.updateMany).toHaveBeenCalledWith({
+      where: {
+        workspaceId: "workspace_1",
+        instagramAccountId: "account_1",
+        lastErrorKind: { in: ["AUTHENTICATION", "CONFIGURATION"] },
+      },
+      data: {
+        lastErrorAt: null,
+        lastErrorKind: null,
+        lastErrorMessage: null,
+        consecutiveFailures: 0,
+      },
     });
     expect(mocks.transaction.auditEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({

@@ -11,6 +11,7 @@ O ReplyFlow trata o workspace ativo como a fronteira de autorização para todos
 5. Alertas do worker carregam `workspaceId` e são filtrados antes de chegar ao diagnóstico. Alertas antigos sem escopo não são exibidos.
 6. Tokens, access tokens da Meta, conteúdo de mensagens e anotações internas não entram na trilha de auditoria.
 7. Conversas repetem workspace + conta + contato nas chaves estrangeiras; responsáveis só podem ser integrantes do mesmo workspace.
+8. A recuperação de erros de credencial filtra simultaneamente `workspaceId` e `instagramAccountId`; renovar uma conta nunca altera campanhas de outra empresa.
 
 ## Entradas deliberadamente públicas
 
@@ -40,4 +41,4 @@ npm test
 npm run build -- --webpack
 ```
 
-Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria, contatos, conversas, filtragem de alertas e métricas da fila. O CRM executa `npm run test:contacts-db` e `npm run test:conversations-db` contra schemas PostgreSQL descartáveis; `npm run test:dm-retry-queue` valida deduplicação e isolamento dos jobs em Redis real.
+Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria, contatos, conversas, filtragem de alertas, métricas da fila e recuperação do estado das automações. O CRM executa `npm run test:contacts-db` e `npm run test:conversations-db` contra schemas PostgreSQL descartáveis; `npm run test:dm-retry-queue` valida deduplicação e isolamento dos jobs em Redis real; `npm run test:automation-state-db` aprova a projeção operacional e seu índice após todas as migrations reais.

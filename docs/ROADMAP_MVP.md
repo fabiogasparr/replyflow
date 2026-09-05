@@ -108,13 +108,22 @@ Objetivo: consolidar o principal caso de uso comercial.
 - [ ] Refinar palavras-chave, correspondência parcial e palavra inteira.
 - [ ] Preservar respostas públicas, mensagens privadas e personalização.
 - [ ] Melhorar botões, links rastreáveis e follow-up.
-- [ ] Criar estados claros para pausado, ativo, com erro e aguardando publicação.
+- [x] Criar estados claros para pausado, ativo, com erro e aguardando publicação.
 - [ ] Dividir o worker em handlers menores.
 - [x] Criar fila de falhas e reprocessamento manual seguro.
 - [x] Exibir saúde do worker e atraso das filas no painel.
-- [ ] Testar idempotência, concorrência e limites com Redis real.
+- [x] Testar idempotência, concorrência e limites com Redis real.
 
 Critério de saída: campanhas processam eventos duplicados, falhas e rate limits sem enviar mensagens indevidas.
+
+Progresso validado em 5 de setembro de 2026:
+
+- A lista de campanhas diferencia ativa, pausada, aguardando publicação e com erro, com busca e filtros operacionais.
+- O worker projeta sucesso e falha sem alterar o resultado do envio nem provocar uma nova tentativa quando a projeção estiver indisponível.
+- Falhas de configuração, autenticação, limite da Meta, entrega individual e plataforma são classificadas separadamente; uma restrição de um destinatário não derruba toda a campanha.
+- Reconectar a conta ou renovar o token remove imediatamente erros de credencial da conta e do workspace corretos, dentro da mesma transação.
+- Os diagnósticos persistidos são higienizados e não são enviados ao navegador; a API retorna somente explicações estáveis em português.
+- A migration aditiva foi aprovada depois das 26 migrations reais em um schema PostgreSQL descartável. Detalhes e rollback estão em `docs/AUTOMATION_OPERATIONAL_STATE.md`.
 
 ## Marco 4 — Contatos e conversas
 
@@ -192,7 +201,7 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 
 ## Próxima execução recomendada
 
-1. Evoluir contatos e inbox sobre a base multiempresa já validada.
+1. Dividir o worker em handlers menores, preservando idempotência e sem alterar o contrato dos jobs.
 2. Concluir a tradução dos textos de fallback do worker e das mensagens técnicas exibidas ao usuário.
 3. Adicionar cobrança recorrente e aplicação de limites de uso por plano.
 4. Criar o painel administrativo global de clientes, planos e uso.

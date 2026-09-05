@@ -15,6 +15,7 @@ import {
   assertWorkspacePlanCapacity,
   WorkspacePlanLimitError,
 } from "@/lib/billing/plans";
+import { clearAutomationCredentialFailures } from "@/lib/automations/operational-state";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -160,6 +161,12 @@ export async function GET(request: NextRequest) {
               webhookSubscribed,
             },
           });
+
+      await clearAutomationCredentialFailures(
+        transaction,
+        state.workspaceId,
+        account.id
+      );
       await transaction.auditEvent.create({
         data: createAuditEventData({
           workspaceId: state.workspaceId,

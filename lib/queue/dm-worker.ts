@@ -34,6 +34,10 @@ import {
 } from "@/lib/billing/usage";
 import { recordWorkerAlert } from "@/lib/ops/worker-health";
 import {
+  recordAutomationFailure,
+  recordAutomationSuccess,
+} from "@/lib/automations/operational-state";
+import {
   buildTrackedUrl,
   renderMessageWithTracking,
   renderMessageWithoutLink,
@@ -332,6 +336,10 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           errorMessage: "No Instagram access token available",
         },
       });
+      await recordAutomationFailure(
+        automation.id,
+        new Error("No Instagram access token available")
+      );
       continue;
     }
 
@@ -365,6 +373,10 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           errorMessage: "Failed to decrypt Instagram access token",
         },
       });
+      await recordAutomationFailure(
+        automation.id,
+        new Error("Failed to decrypt Instagram access token")
+      );
       continue;
     }
 
@@ -518,6 +530,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           errorMessage: formatError(error),
         },
       });
+      await recordAutomationFailure(automation.id, error);
       throw error;
     }
 
@@ -712,6 +725,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           errorMessage: null,
         },
       });
+      await recordAutomationSuccess(automation.id);
     } catch (error) {
       await releaseWorkspaceDMReservation(
         automation.workspaceId,
@@ -731,6 +745,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
           errorMessage: formatError(error),
         },
       });
+      await recordAutomationFailure(automation.id, error);
       throw error;
     }
   }
@@ -764,9 +779,15 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
 
   if (
     !automation ||
-    automation.instagramAccount.instagramId !== instagramAccountId ||
-    !automation.instagramAccount.accessToken
+    automation.instagramAccount.instagramId !== instagramAccountId
   ) {
+    return;
+  }
+  if (!automation.instagramAccount.accessToken) {
+    await recordAutomationFailure(
+      automation.id,
+      new Error("No Instagram access token available")
+    );
     return;
   }
 
@@ -802,6 +823,10 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
   try {
     accessToken = decryptToken(automation.instagramAccount.accessToken);
   } catch {
+    await recordAutomationFailure(
+      automation.id,
+      new Error("Failed to decrypt Instagram access token")
+    );
     return;
   }
 
@@ -915,6 +940,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         errorMessage: null,
       },
     });
+    await recordAutomationSuccess(automation.id);
   } catch (error) {
     await releaseWorkspaceDMReservation(automation.workspaceId, usage.periodStart);
 
@@ -955,6 +981,7 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
         errorMessage: formatError(error),
       },
     });
+    await recordAutomationFailure(automation.id, error);
     throw error;
   }
 }
@@ -976,9 +1003,15 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
     !automation ||
     !automation.followUpEnabled ||
     !automation.followUpMessage?.trim() ||
-    automation.instagramAccount.instagramId !== instagramAccountId ||
-    !automation.instagramAccount.accessToken
+    automation.instagramAccount.instagramId !== instagramAccountId
   ) {
+    return;
+  }
+  if (!automation.instagramAccount.accessToken) {
+    await recordAutomationFailure(
+      automation.id,
+      new Error("No Instagram access token available")
+    );
     return;
   }
 
@@ -986,6 +1019,10 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
   try {
     accessToken = decryptToken(automation.instagramAccount.accessToken);
   } catch {
+    await recordAutomationFailure(
+      automation.id,
+      new Error("Failed to decrypt Instagram access token")
+    );
     return;
   }
 
@@ -999,7 +1036,9 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
         commenterName: commenterName ?? null,
       })
     );
+    await recordAutomationSuccess(automation.id);
   } catch (error) {
+    await recordAutomationFailure(automation.id, error);
     console.log(
       "[DM Worker] Failed to send follow-up message:",
       formatError(error)
@@ -1123,6 +1162,10 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: "No Instagram access token available",
         },
       });
+      await recordAutomationFailure(
+        automation.id,
+        new Error("No Instagram access token available")
+      );
       continue;
     }
 
@@ -1148,6 +1191,10 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: "Failed to decrypt Instagram access token",
         },
       });
+      await recordAutomationFailure(
+        automation.id,
+        new Error("Failed to decrypt Instagram access token")
+      );
       continue;
     }
 
@@ -1285,6 +1332,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: null,
         },
       });
+      await recordAutomationSuccess(automation.id);
     } catch (error) {
       await releaseWorkspaceDMReservation(
         automation.workspaceId,
@@ -1311,6 +1359,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
           errorMessage: formatError(error),
         },
       });
+      await recordAutomationFailure(automation.id, error);
       throw error;
     }
   }

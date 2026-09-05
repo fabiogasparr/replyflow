@@ -111,7 +111,7 @@ Objetivo: consolidar o principal caso de uso comercial.
 - [ ] Criar estados claros para pausado, ativo, com erro e aguardando publicação.
 - [ ] Dividir o worker em handlers menores.
 - [x] Criar fila de falhas e reprocessamento manual seguro.
-- [ ] Exibir saúde do worker e atraso das filas no painel.
+- [x] Exibir saúde do worker e atraso das filas no painel.
 - [ ] Testar idempotência, concorrência e limites com Redis real.
 
 Critério de saída: campanhas processam eventos duplicados, falhas e rate limits sem enviar mensagens indevidas.

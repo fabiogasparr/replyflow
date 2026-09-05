@@ -1,32 +1,44 @@
 import { NextResponse } from "next/server";
-import { getCurrentWorkspaceId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { getDMQueue } from "@/lib/queue/client";
+import {
+  getWorkspaceQueueSnapshot,
+  unavailableQueueSnapshot,
+} from "@/lib/ops/queue-observability";
 import { getWorkerAlerts, getWorkerHealth } from "@/lib/ops/worker-health";
+import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
 
 export const runtime = "nodejs";
 
+async function settled<T>(operation: Promise<T>) {
+  try {
+    return { ok: true as const, value: await operation };
+  } catch {
+    return { ok: false as const, value: null };
+  }
+}
+
 export async function GET() {
-  const workspaceId = await getCurrentWorkspaceId();
-  if (!workspaceId) {
+  const context = await getCurrentWorkspaceContext();
+  if (!context) {
     return NextResponse.json(
       { success: false, error: "Faça login para continuar" },
       { status: 401 }
     );
   }
+  const workspaceId = context.workspaceId;
 
   const [
-    queueCounts,
-    workerHealth,
-    workerAlerts,
+    queueResult,
+    workerResult,
+    alertsResult,
     webhookFailures,
     dmFailures,
     tokenRefreshFailures,
     operationalEvents,
   ] = await Promise.all([
-    getDMQueue().getJobCounts("waiting", "active", "delayed", "failed"),
-    getWorkerHealth(),
-    getWorkerAlerts(workspaceId, 10),
+    settled(getWorkspaceQueueSnapshot(workspaceId)),
+    settled(getWorkerHealth()),
+    settled(getWorkerAlerts(workspaceId, 10)),
     prisma.webhookEvent.findMany({
       where: { workspaceId, status: "FAILED" },
       orderBy: { createdAt: "desc" },
@@ -71,13 +83,10 @@ export async function GET() {
         id: true,
         message: true,
         createdAt: true,
-        payload: true,
       },
     }),
     prisma.operationalEvent.findMany({
-      where: {
-        OR: [{ workspaceId }, { workspaceId: null }],
-      },
+      where: { workspaceId },
       orderBy: { createdAt: "desc" },
       take: 20,
       select: {
@@ -91,12 +100,26 @@ export async function GET() {
     }),
   ]);
 
+  const redisAvailable = queueResult.ok && workerResult.ok && alertsResult.ok;
+  const queue = queueResult.ok
+    ? queueResult.value
+    : unavailableQueueSnapshot();
+  const workerHealth = workerResult.ok
+    ? workerResult.value
+    : { healthy: false, heartbeat: null, ageMs: null };
+
   return NextResponse.json({
     success: true,
     data: {
-      queueCounts,
+      services: {
+        database: { available: true },
+        redis: { available: redisAvailable },
+        worker: { available: workerHealth.healthy },
+      },
+      queue,
+      queueCounts: queue.counts,
       workerHealth,
-      workerAlerts,
+      workerAlerts: alertsResult.ok ? alertsResult.value : [],
       webhookFailures,
       dmFailures,
       tokenRefreshFailures,

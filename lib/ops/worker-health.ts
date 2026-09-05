@@ -38,6 +38,32 @@ function parseJson<T>(value: string | null): T | null {
   }
 }
 
+function isWorkerHeartbeat(value: unknown): value is WorkerHeartbeat {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<WorkerHeartbeat>;
+  return (
+    candidate.status === "running" &&
+    candidate.worker === "dm" &&
+    typeof candidate.pid === "number" &&
+    Number.isInteger(candidate.pid) &&
+    typeof candidate.checkedAt === "string" &&
+    Number.isFinite(Date.parse(candidate.checkedAt))
+  );
+}
+
+function isWorkerAlert(value: unknown): value is WorkerAlert {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<WorkerAlert>;
+  return (
+    (typeof candidate.workspaceId === "string" ||
+      candidate.workspaceId === null) &&
+    (candidate.level === "warning" || candidate.level === "error") &&
+    typeof candidate.message === "string" &&
+    typeof candidate.createdAt === "string" &&
+    Number.isFinite(Date.parse(candidate.createdAt))
+  );
+}
+
 export async function recordWorkerHeartbeat(
   heartbeat: Omit<WorkerHeartbeat, "checkedAt" | "status" | "worker">
 ) {
@@ -57,15 +83,16 @@ export async function recordWorkerHeartbeat(
 }
 
 export async function getWorkerHealth(): Promise<WorkerHealth> {
-  const heartbeat = parseJson<WorkerHeartbeat>(
+  const parsed = parseJson<unknown>(
     await getRedisConnection().get(WORKER_HEALTH_KEY)
   );
+  const heartbeat = isWorkerHeartbeat(parsed) ? parsed : null;
 
   if (!heartbeat) {
     return { healthy: false, heartbeat: null, ageMs: null };
   }
 
-  const ageMs = Date.now() - new Date(heartbeat.checkedAt).getTime();
+  const ageMs = Math.max(0, Date.now() - new Date(heartbeat.checkedAt).getTime());
   return {
     healthy: ageMs <= WORKER_HEARTBEAT_TTL_SECONDS * 1000,
     heartbeat,
@@ -91,7 +118,8 @@ export async function getWorkerAlerts(
   const values = await getRedisConnection().lrange(WORKER_ALERTS_KEY, 0, -1);
 
   return values
-    .map((value) => parseJson<WorkerAlert>(value))
+    .map((value) => parseJson<unknown>(value))
+    .filter(isWorkerAlert)
     .filter(
       (value): value is WorkerAlert => value?.workspaceId === workspaceId
     )

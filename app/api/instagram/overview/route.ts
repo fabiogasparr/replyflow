@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error:
-          "Instagram account not connected. Please connect your account first.",
+          "Conta do Instagram não conectada. Conecte sua conta primeiro.",
       },
       { status: 400 }
     );

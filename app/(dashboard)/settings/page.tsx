@@ -54,6 +54,12 @@ interface WorkspaceMembersData {
   }>;
 }
 
+const planLabels: Record<SettingsData["workspace"]["plan"], string> = {
+  FREE: "Gratuito",
+  PRO: "Pro",
+  AGENCY: "Agência",
+};
+
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsData | null>(null);
   const [membersData, setMembersData] = useState<WorkspaceMembersData | null>(
@@ -210,6 +216,9 @@ export default function SettingsPage() {
     (membersData?.members.length ?? 0) +
     (membersData?.invitations.length ?? 0);
   const memberLimitReached = reservedSeats >= memberLimit;
+  const currentPlanLabel = data
+    ? planLabels[data.workspace.plan]
+    : "Gratuito";
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -271,11 +280,13 @@ export default function SettingsPage() {
                     @{account.username}
                   </p>
                   <p className="mt-1 text-xs text-muted">
-                    Token expira em{" "}
+                    Conexão válida até{" "}
                     {account.tokenExpiresAt
                       ? new Date(account.tokenExpiresAt).toLocaleDateString("pt-BR")
                       : "data indisponível"}{" "}
-                    · {account.webhookSubscribed ? "Webhook ativo" : "Webhook pendente"}
+                    · {account.webhookSubscribed
+                      ? "Notificações ativas"
+                      : "Notificações pendentes"}
                   </p>
                 </div>
                 <button
@@ -315,7 +326,7 @@ export default function SettingsPage() {
         <p className="mb-6 text-xs leading-5 text-muted">
           Proprietários controlam tudo; administradores operam contas e automações;
           membros acompanham resultados e respondem conversas. {reservedSeats} de{" "}
-          {memberLimit} assentos estão reservados no plano {data?.workspace.planLabel}.
+          {memberLimit} assentos estão reservados no plano {currentPlanLabel}.
         </p>
         <div className="space-y-3">
           {membersData?.members.map((member) => {
@@ -401,7 +412,7 @@ export default function SettingsPage() {
                       {new Date(invitation.expiresAt).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() =>
@@ -437,19 +448,21 @@ export default function SettingsPage() {
         {canManageMembers && (
           <form
             onSubmit={inviteMember}
-            className="mt-6 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_140px_auto]"
+            className="mt-6 grid gap-3 border-t border-border pt-4 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
           >
             <input
               type="email"
               value={inviteEmail}
               onChange={(event) => setInviteEmail(event.target.value)}
               placeholder="pessoa@empresa.com.br"
+              aria-label="E-mail do integrante"
               className="rounded border border-border bg-surface px-4 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent/40"
               required
               disabled={memberLimitReached}
             />
             <select
               value={inviteRole}
+              aria-label="Função do integrante"
               onChange={(event) =>
                 setInviteRole(event.target.value as "ADMIN" | "MEMBER")
               }
@@ -491,7 +504,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <span className="rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-sm font-semibold text-accent">
-            {data?.workspace.planLabel ?? "Free"}
+            {currentPlanLabel}
           </span>
         </div>
         <div className="flex items-center justify-between gap-3 py-3">

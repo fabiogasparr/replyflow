@@ -15,8 +15,8 @@ import { parseCsv } from "@/lib/utils/csv";
 import { IMPORT_QUEUE_KEY, IMPORT_ACCOUNT_KEY } from "@/lib/import-queue";
 
 const SAMPLE = `keywords,dm_message,public_reply,tracked_url,opening_dm,opening_dm_button
-"yc","here it is: {link}","sent. check dms","https://events.ycombinator.com/startup-school-2026","hey! click below for the referral","send link"
-"LINK,SHOP","grab it here: {link}","dmed u",,,`;
+"GUIA","Aqui está o guia: {link}","Enviei uma DM para você!","https://example.com/guia","Olá! Toque abaixo para receber o guia","Enviar guia"
+"LINK,LOJA","Confira aqui: {link}","Enviei por DM!",,,`;
 
 export default function ImportCampaignsPage() {
   const router = useRouter();

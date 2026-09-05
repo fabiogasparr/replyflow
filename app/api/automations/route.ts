@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validationOptions } from "@/lib/validation";
 import { z } from "zod";
 import { getCurrentWorkspaceId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
@@ -64,11 +65,11 @@ const createAutomationSchema = z
   // A campaign must target a specific post, any post, or the next reel.
   .refine(
     (d) => d.matchAnyPost || d.pendingNextReel || Boolean(d.postId),
-    { message: "Choose which post(s) trigger the campaign", path: ["postId"] }
+    { message: "Escolha quais posts acionam a campanha", path: ["postId"] }
   )
   // And it must match either specific words or any word.
   .refine((d) => d.matchAnyWord || d.keywords.length >= 1, {
-    message: "Add at least one keyword, or match any word",
+    message: "Adicione ao menos uma palavra-chave ou aceite qualquer palavra",
     path: ["keywords"],
   })
   // An opening DM needs both a message and a button label.
@@ -77,7 +78,7 @@ const createAutomationSchema = z
       !d.openingDmEnabled ||
       (Boolean(d.openingDmMessage?.trim()) &&
         Boolean(d.openingDmButtonLabel?.trim())),
-    { message: "Opening DM needs a message and a button label", path: ["openingDmMessage"] }
+    { message: "A DM inicial precisa de mensagem e texto do botão", path: ["openingDmMessage"] }
   );
 
 const updateAutomationSchema = z.object({
@@ -293,14 +294,14 @@ export async function POST(request: NextRequest) {
 
   const workspaceId = context.workspaceId;
 
-  const body = await request.json();
-  const parsed = createAutomationSchema.safeParse(body);
+  const body = await request.json().catch(() => null);
+  const parsed = createAutomationSchema.safeParse(body, validationOptions);
 
   if (!parsed.success) {
     return NextResponse.json(
       {
         success: false,
-        error: "Invalid input",
+        error: "Dados inválidos",
         details: parsed.error.flatten(),
       },
       { status: 400 }
@@ -329,14 +330,14 @@ export async function POST(request: NextRequest) {
 
   if (!workspace) {
     return NextResponse.json(
-      { success: false, error: "Workspace not found" },
+      { success: false, error: "Espaço de trabalho não encontrado" },
       { status: 404 }
     );
   }
 
   if (!instagramAccount) {
     return NextResponse.json(
-      { success: false, error: "Connect Instagram before creating campaigns" },
+      { success: false, error: "Conecte o Instagram antes de criar campanhas" },
       { status: 400 }
     );
   }
@@ -356,7 +357,7 @@ export async function POST(request: NextRequest) {
     linkCreates.push({
       workspaceId,
       slug: generateTrackedLinkSlug(),
-      label: "Primary campaign link",
+      label: "Link principal da campanha",
       destinationUrl: trackedDestinationUrl,
     });
   }
@@ -466,19 +467,19 @@ export async function PATCH(request: NextRequest) {
   const automationId = request.nextUrl.searchParams.get("id");
   if (!automationId) {
     return NextResponse.json(
-      { success: false, error: "Missing campaign ID" },
+      { success: false, error: "Identificador da campanha não informado" },
       { status: 400 }
     );
   }
 
-  const body = await request.json();
-  const parsed = updateAutomationSchema.safeParse(body);
+  const body = await request.json().catch(() => null);
+  const parsed = updateAutomationSchema.safeParse(body, validationOptions);
 
   if (!parsed.success) {
     return NextResponse.json(
       {
         success: false,
-        error: "Invalid input",
+        error: "Dados inválidos",
         details: parsed.error.flatten(),
       },
       { status: 400 }
@@ -566,7 +567,7 @@ export async function PATCH(request: NextRequest) {
           workspaceId,
           automationId,
           slug: generateTrackedLinkSlug(),
-          label: "Primary campaign link",
+          label: "Link principal da campanha",
           destinationUrl: trackedDestinationUrl,
         },
       });
@@ -632,7 +633,7 @@ export async function DELETE(request: NextRequest) {
   const automationId = request.nextUrl.searchParams.get("id");
   if (!automationId) {
     return NextResponse.json(
-      { success: false, error: "Missing campaign ID" },
+      { success: false, error: "Identificador da campanha não informado" },
       { status: 400 }
     );
   }

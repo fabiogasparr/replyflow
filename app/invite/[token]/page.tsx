@@ -9,6 +9,12 @@ type InvitePageProps = {
   params: Promise<{ token: string }>;
 };
 
+const roleLabels = {
+  OWNER: "proprietário",
+  ADMIN: "administrador",
+  MEMBER: "membro",
+} as const;
+
 export const metadata: Metadata = {
   title: "Aceitar convite",
   robots: { index: false, follow: false },
@@ -42,12 +48,12 @@ export default async function InvitePage({ params }: InvitePageProps) {
           <p className="text-xs font-semibold uppercase tracking-wide text-accent">
             Convite para equipe
           </p>
-          <h1 className="font-display mt-4 text-3xl font-bold leading-tight text-foreground">
+          <h1 className="font-display mt-4 break-words text-3xl font-bold leading-tight text-foreground">
             Entre em {invitation.workspace.name}
           </h1>
-          <p className="mt-4 text-sm leading-6 text-muted">
+          <p className="mt-4 break-words text-sm leading-6 text-muted">
             O convite foi enviado para {invitation.email} com o perfil{" "}
-            {invitation.role.toLowerCase()}.
+            {roleLabels[invitation.role]}.
           </p>
           <div className="mt-8">
             {expired ? (

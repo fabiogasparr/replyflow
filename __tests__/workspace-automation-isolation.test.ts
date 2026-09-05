@@ -45,6 +45,16 @@ function updateRequest(id: string) {
 }
 
 describe("automation workspace isolation", () => {
+  it("returns a client error for malformed JSON without touching the database", async () => {
+    const request = new NextRequest("http://localhost/api/automations?id=automation_1", {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: "{",
+    });
+    const response = await PATCH(request);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Dados inválidos");
+    expect(prisma.automation.findFirst).not.toHaveBeenCalled();
+  });
+
   it("does not reveal or update an automation from another workspace", async () => {
     prisma.automation.findFirst.mockResolvedValue(null);
 

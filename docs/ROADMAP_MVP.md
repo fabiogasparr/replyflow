@@ -26,7 +26,7 @@ Objetivo: tornar a base confiável para desenvolvimento do produto.
 - [x] Executar lint, typecheck, testes e build.
 - [x] Confirmar proteção de `.env` e credenciais.
 - [x] Documentar diagnóstico e roadmap.
-- [ ] Tornar o repositório remoto privado.
+- [x] Definir a visibilidade remota: publicação incremental no repositório público autorizada pelo responsável.
 - [x] Instalar Docker CLI, Compose e runtime Colima/QEMU.
 - [x] Subir PostgreSQL e Redis.
 - [x] Executar todas as migrations em banco limpo.
@@ -62,6 +62,9 @@ Progresso validado em 4 de setembro de 2026:
 - Configuração central de produto e títulos do painel adicionada com testes automatizados.
 - Catálogo tipado em pt-BR e formatadores compartilhados de datas e números adicionados com testes automatizados.
 - Início, campanhas, desempenho, conversas, histórico e diagnóstico passaram a usar textos e formatos brasileiros; a tradução das superfícies restantes continua em andamento.
+- Configurações, convites, relatórios compartilhados, páginas públicas e os oito modelos de campanha foram traduzidos; contraste e apresentação em telas estreitas receberam correções.
+- E-mails de acesso por SMTP e Resend usam o mesmo conteúdo em pt-BR, com testes de preservação do link, escape HTML e falha de entrega. Nenhum e-mail real foi enviado nesta validação.
+- Mensagens de validação de campanhas usam português; requisições JSON malformadas retornam erro de entrada. Ainda há mensagens técnicas e textos de fallback do worker a revisar antes de considerar a tradução integral concluída.
 
 ## Marco 2 — SaaS multiempresa
 
@@ -173,8 +176,8 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 
 ## Próxima execução recomendada
 
-1. Tornar o repositório privado antes de iniciar código proprietário.
-2. Concluir a tradução de configurações, contatos, mensagens de erro secundárias e e-mails.
-3. Evoluir contatos e inbox sobre a base multiempresa já validada.
-4. Adicionar cobrança recorrente e enforcement de uso por plano.
-5. Criar o painel administrativo global de clientes, planos e uso.
+1. Evoluir contatos e inbox sobre a base multiempresa já validada.
+2. Concluir a tradução dos textos de fallback do worker e das mensagens técnicas exibidas ao usuário.
+3. Adicionar cobrança recorrente e aplicação de limites de uso por plano.
+4. Criar o painel administrativo global de clientes, planos e uso.
+5. Publicar cada módulo validado em uma branch própria, conforme autorização do responsável.

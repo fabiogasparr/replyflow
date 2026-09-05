@@ -5,14 +5,14 @@ import TemplateVisual from "@/components/template-visual";
 import { CAMPAIGN_TEMPLATES } from "@/lib/templates/campaign-templates";
 
 export const metadata: Metadata = {
-  title: "Instagram Comment to DM Templates - ReplyFlow",
+  title: "Modelos de comentários para DM no Instagram — ReplyFlow",
   description:
-    "Copy ready-to-launch Instagram comment-to-DM campaign templates for product links, lead magnets, real estate, fitness, restaurants, events, and creators.",
+    "Copie modelos prontos de campanhas que transformam comentários em DMs para produtos, materiais gratuitos, imóveis, fitness, restaurantes, eventos e criadores.",
   keywords: [
-    "Instagram comment to DM templates",
-    "comment to DM campaigns",
-    "Instagram DM automation templates",
-    "Manychat alternative templates",
+    "modelos de comentários para DM no Instagram",
+    "campanhas de comentários para DM",
+    "modelos de automação de DM no Instagram",
+    "modelos alternativos ao Manychat",
   ],
 };
 
@@ -21,31 +21,32 @@ export default function TemplatesPage() {
     <main className="min-h-screen bg-background text-foreground">
       <PublicSiteHeader active="templates" />
 
-      <section className="border-b border-white/10 bg-zinc-950/55">
+      <section className="border-b border-border bg-surface">
         <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-16 sm:px-6 lg:grid-cols-[0.88fr_1.12fr] lg:px-8 lg:py-20">
           <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-cyan-200">
-              Public template library
+            <p className="text-sm font-bold uppercase tracking-wide text-success">
+              Biblioteca pública de modelos
             </p>
-            <h1 className="mt-4 text-5xl font-black leading-[1.02] text-white sm:text-6xl">
-              Instagram campaigns you can copy in minutes
+            <h1 className="mt-4 text-5xl font-black leading-[1.02] text-foreground sm:text-6xl">
+              Campanhas para Instagram que você copia em minutos
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-300">
-              Start with proven comment-to-DM playbooks for lead magnets,
-              product links, events, service menus, and agency client campaigns.
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-foreground/80">
+              Comece com estratégias comprovadas para transformar comentários em
+              DMs de materiais gratuitos, produtos, eventos, cardápios de serviços
+              e campanhas de clientes da sua agência.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center bg-cyan-300 px-6 py-3 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
+                className="inline-flex items-center justify-center bg-accent px-6 py-3 text-sm font-bold text-foreground transition hover:bg-accent-hover"
               >
-                Start free
+                Começar grátis
               </Link>
               <a
                 href="#template-grid"
-                className="inline-flex items-center justify-center border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white transition hover:border-white/20 hover:bg-white/[0.08]"
+                className="inline-flex items-center justify-center border border-border bg-white px-6 py-3 text-sm font-bold text-foreground transition hover:border-border-hover hover:bg-surface"
               >
-                Browse templates
+                Ver modelos
               </a>
             </div>
           </div>
@@ -66,25 +67,25 @@ export default function TemplatesPage() {
           {CAMPAIGN_TEMPLATES.map((template) => (
             <article
               key={template.slug}
-              className="flex min-h-full flex-col border border-white/10 bg-white/[0.035] p-5 transition hover:border-white/20 hover:bg-white/[0.055]"
+              className="flex min-h-full flex-col border border-border bg-white p-5 transition hover:border-border-hover hover:bg-surface"
             >
               <div className="mb-5">
                 <TemplateVisual template={template} compact />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+              <p className="text-xs font-semibold uppercase tracking-wide text-success">
                 {template.category}
               </p>
-              <h2 className="mt-3 text-xl font-black leading-tight text-white">
+              <h2 className="mt-3 text-xl font-black leading-tight text-foreground">
                 {template.title}
               </h2>
-              <p className="mt-3 text-sm leading-6 text-zinc-400">
+              <p className="mt-3 text-sm leading-6 text-foreground/80">
                 {template.summary}
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 {template.keywords.map((keyword) => (
                   <span
                     key={keyword}
-                    className="border border-white/10 bg-zinc-950 px-2 py-1 text-xs font-semibold text-zinc-300"
+                    className="border border-border bg-surface px-2 py-1 text-xs font-semibold text-foreground/80"
                   >
                     {keyword}
                   </span>
@@ -93,15 +94,15 @@ export default function TemplatesPage() {
               <div className="mt-auto grid gap-2 pt-6">
                 <Link
                   href={`/templates/${template.slug}`}
-                  className="inline-flex w-full items-center justify-center border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-white transition hover:border-white/20 hover:bg-white/[0.08]"
+                  className="inline-flex w-full items-center justify-center border border-border bg-white px-4 py-3 text-sm font-bold text-foreground transition hover:border-border-hover hover:bg-surface"
                 >
-                  View playbook
+                  Ver passo a passo
                 </Link>
                 <Link
                   href={`/login?template=${template.slug}`}
-                  className="inline-flex w-full items-center justify-center bg-cyan-300 px-4 py-3 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
+                  className="inline-flex w-full items-center justify-center bg-accent px-4 py-3 text-sm font-bold text-foreground transition hover:bg-accent-hover"
                 >
-                  Use this template
+                  Usar este modelo
                 </Link>
               </div>
             </article>

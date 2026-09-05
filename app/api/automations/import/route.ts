@@ -42,11 +42,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = importSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { success: false, error: "Invalid import data" },
+      { success: false, error: "Dados de importação inválidos" },
       { status: 400 }
     );
   }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   );
   if (!account) {
     return NextResponse.json(
-      { success: false, error: "Instagram account not found" },
+      { success: false, error: "Conta do Instagram não encontrada" },
       { status: 400 }
     );
   }
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   for (const campaign of parsed.data.campaigns) {
     row++;
     if (usedPostIds.has(campaign.postId)) {
-      skipped.push({ row, reason: "a campaign already exists for this post" });
+      skipped.push({ row, reason: "já existe uma campanha para este post" });
       continue;
     }
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         : null;
     const name =
       (campaign.name ?? "").trim().slice(0, 100) ||
-      `Imported: ${campaign.keywords[0]}`;
+      `Importada: ${campaign.keywords[0]}`;
     const publicReply = (campaign.publicReplyMessage ?? "").trim();
 
     await prisma.automation.create({
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
                 create: {
                   workspaceId: context.workspaceId,
                   slug: generateTrackedLinkSlug(),
-                  label: "Primary campaign link",
+                  label: "Link principal da campanha",
                   destinationUrl: validTrackedUrl,
                 },
               },

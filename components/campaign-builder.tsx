@@ -398,7 +398,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
     setSaving(true);
 
     const payload = {
-      name: name.trim() || `Campaign for @${username}`,
+      name: name.trim() || `Campanha para @${username}`,
       instagramAccountId: selectedAccountId,
       postId: triggerScope === "specific" ? postId : null,
       postUrl: triggerScope === "specific" ? postUrl : null,
@@ -491,7 +491,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         const firstField = fieldErrors && Object.keys(fieldErrors)[0];
         setError(
           firstField
-            ? `${firstField}: ${fieldErrors[firstField][0]}`
+            ? fieldErrors[firstField][0]
             : data.error ?? "Não foi possível salvar a campanha"
         );
         if (typeof window !== "undefined")

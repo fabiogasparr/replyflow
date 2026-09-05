@@ -89,11 +89,12 @@ export function InstagramConnectNotice() {
       <Notice tone="error" title="Falha ao conectar o Instagram">
         <p>
           O Instagram aceitou o acesso, mas a conexão não foi concluída. Isso
-          geralmente indica uma URI de redirecionamento diferente ou permissões
+          geralmente indica um endereço de redirecionamento diferente ou permissões
           ausentes no aplicativo da Meta.
         </p>
         {reason && (
           <p className="mt-2 font-mono text-xs break-words opacity-80">
+            <span className="font-sans font-semibold">Detalhes técnicos: </span>
             {reason}
           </p>
         )}

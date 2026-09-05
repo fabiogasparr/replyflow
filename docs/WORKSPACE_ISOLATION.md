@@ -27,7 +27,7 @@ Essas entradas não usam o workspace ativo porque são fluxos de capacidade ou i
 
 Crons e workers percorrem vários workspaces por desenho. Cada job parte de uma conta do Instagram persistida, propaga seu `workspaceId` para logs, uso e eventos operacionais e valida que a automação pertence à mesma conta antes de enviar mensagens.
 
-O endpoint de saúde expõe somente telemetria da infraestrutura; nenhum payload de cliente é consultado nele. A tela de diagnóstico pode mostrar saúde e contagens globais da fila, mas falhas, comentários, webhooks, tokens e alertas são filtrados pelo workspace ativo.
+O endpoint de saúde expõe somente telemetria da infraestrutura; nenhum payload de cliente é consultado nele. Na tela autenticada de diagnóstico, falhas, comentários, webhooks, tokens, eventos e alertas são filtrados pelo workspace ativo. As contagens e o atraso do BullMQ também são calculados somente sobre jobs cujas contas do Instagram pertencem à empresa ativa.
 
 ## Verificação obrigatória
 
@@ -40,4 +40,4 @@ npm test
 npm run build -- --webpack
 ```
 
-Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria, contatos, conversas e filtragem de alertas do worker. O CRM executa `npm run test:contacts-db` e `npm run test:conversations-db` contra schemas PostgreSQL descartáveis para validar chaves compostas, backfill, atribuição e ingestão concorrente.
+Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria, contatos, conversas, filtragem de alertas e métricas da fila. O CRM executa `npm run test:contacts-db` e `npm run test:conversations-db` contra schemas PostgreSQL descartáveis; `npm run test:dm-retry-queue` valida deduplicação e isolamento dos jobs em Redis real.

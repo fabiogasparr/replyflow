@@ -1,10 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import StatusBadge from "@/components/status-badge";
 import { formatDateTime } from "@/lib/i18n";
 
 interface DiagnosticsData {
+  services: {
+    database: { available: boolean };
+    redis: { available: boolean };
+    worker: { available: boolean };
+  };
+  queue: {
+    status: "IDLE" | "HEALTHY" | "DEGRADED" | "CRITICAL" | "UNAVAILABLE";
+    counts: Record<string, number>;
+    oldestWaitingAt: string | null;
+    oldestWaitingAgeMs: number | null;
+    nextDelayedAt: string | null;
+    truncated: boolean;
+    scanLimit: number;
+    checkedAt: string;
+  };
   queueCounts: Record<string, number>;
   workerHealth: {
     healthy: boolean;
@@ -64,6 +80,23 @@ const queueLabels: Record<string, string> = {
   failed: "com falha",
 };
 
+const queueHealthLabels = {
+  IDLE: "Sem pendências",
+  HEALTHY: "Fluxo normal",
+  DEGRADED: "Fila atrasada",
+  CRITICAL: "Atraso crítico",
+  UNAVAILABLE: "Indisponível",
+};
+
+function formatDuration(value: number | null) {
+  if (value == null) return "Sem espera";
+  const seconds = Math.max(0, Math.round(value / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}min`;
+  return `${Math.round(minutes / 60)}h`;
+}
+
 function EmptyState({ label }: { label: string }) {
   return <p className="py-5 text-center text-sm text-muted">{label}</p>;
 }
@@ -86,37 +119,41 @@ function Section({
 export default function DiagnosticsPage() {
   const [data, setData] = useState<DiagnosticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  async function refreshDiagnostics() {
-    setLoading(true);
-    const response = await fetch("/api/admin/diagnostics");
-    const payload = await response.json();
-    if (payload.success) {
+  const refreshDiagnostics = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/diagnostics", {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Não foi possível atualizar o diagnóstico");
+      }
       setData(payload.data);
+      setError(null);
+    } catch (refreshError) {
+      setError(
+        refreshError instanceof Error
+          ? refreshError.message
+          : "Não foi possível atualizar o diagnóstico"
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadInitialDiagnostics() {
-      const response = await fetch("/api/admin/diagnostics");
-      const payload = await response.json();
-      if (active && payload.success) {
-        setData(payload.data);
-      }
-      if (active) {
-        setLoading(false);
-      }
-    }
-
-    void loadInitialDiagnostics();
-
+    const initial = window.setTimeout(() => void refreshDiagnostics(), 0);
+    const interval = window.setInterval(
+      () => void refreshDiagnostics(),
+      30_000
+    );
     return () => {
-      active = false;
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
     };
-  }, []);
+  }, [refreshDiagnostics]);
 
   if (loading && !data) {
     return <div className="panel rounded p-8 h-64" />;
@@ -137,16 +174,31 @@ export default function DiagnosticsPage() {
           <p className="mt-1 text-sm text-muted">
             Saúde dos serviços, filas, webhooks, eventos e alertas do worker.
           </p>
+          {data?.queue.checkedAt && (
+            <p className="mt-1 text-xs text-muted">
+              Atualização automática a cada 30s · última verificação {formatDate(data.queue.checkedAt)}
+            </p>
+          )}
         </div>
         <button
-          onClick={() => void refreshDiagnostics()}
+          disabled={loading}
+          onClick={() => {
+            setLoading(true);
+            void refreshDiagnostics();
+          }}
           className="rounded border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition hover:border-border-hover"
         >
-          Atualizar
+          {loading ? "Atualizando..." : "Atualizar"}
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
+      {error && (
+        <div className="rounded border border-error/25 bg-error/10 px-4 py-3 text-sm text-error">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
         <div className="panel rounded p-4 sm:p-5">
           <p className="text-xs font-semibold uppercase text-muted">
             Saúde do worker
@@ -164,6 +216,49 @@ export default function DiagnosticsPage() {
               : `Último sinal há ${workerAgeSeconds}s`}
           </p>
         </div>
+        <div className="panel rounded p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase text-muted">
+            Conexão Redis
+          </p>
+          <p
+            className={`mt-3 text-2xl font-bold ${
+              data?.services.redis.available ? "text-success" : "text-error"
+            }`}
+          >
+            {data?.services.redis.available ? "Disponível" : "Indisponível"}
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            Filas, alertas e heartbeat do worker
+          </p>
+        </div>
+        <div className="panel rounded p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase text-muted">
+            Atraso da fila
+          </p>
+          <p
+            className={`mt-3 text-2xl font-bold ${
+              data?.queue.status === "CRITICAL" ||
+              data?.queue.status === "UNAVAILABLE"
+                ? "text-error"
+                : data?.queue.status === "DEGRADED"
+                  ? "text-warning"
+                  : "text-success"
+            }`}
+          >
+            {data ? queueHealthLabels[data.queue.status] : "—"}
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            Mais antigo: {formatDuration(data?.queue.oldestWaitingAgeMs ?? null)}
+          </p>
+          {data?.queue.nextDelayedAt && (
+            <p className="mt-1 text-xs text-muted">
+              Próximo agendado: {formatDate(data.queue.nextDelayedAt)}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         {["waiting", "active", "delayed", "failed"].map((key) => (
           <div key={key} className="panel rounded p-4 sm:p-5">
             <p className="text-xs font-semibold uppercase text-muted">
@@ -175,6 +270,13 @@ export default function DiagnosticsPage() {
           </div>
         ))}
       </div>
+
+      {data?.queue.truncated && (
+        <p className="rounded border border-warning/25 bg-warning/10 px-4 py-3 text-xs text-warning">
+          A fila ultrapassou a amostra de {data.queue.scanLimit} jobs por estado.
+          As contagens desta empresa são um limite inferior.
+        </p>
+      )}
 
       <Section title="Alertas recentes do worker">
         {data?.workerAlerts.length ? (
@@ -206,6 +308,11 @@ export default function DiagnosticsPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Falhas e mensagens ignoradas">
+          <div className="mb-3 flex justify-end">
+            <Link href="/logs" className="text-xs font-semibold text-accent hover:underline">
+              Abrir todos os envios
+            </Link>
+          </div>
           {data?.dmFailures.length ? (
             <div className="space-y-3">
               {data.dmFailures.map((item) => (

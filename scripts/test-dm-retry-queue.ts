@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
 import { Queue } from "bullmq";
 import Redis from "ioredis";
+import { summarizeWorkspaceQueueJobs } from "@/lib/ops/queue-observability";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 config({
@@ -61,6 +62,28 @@ async function main() {
     });
     assert.equal(await queue.getJobCountByTypes("wait"), 2);
     console.log("✓ Redis deduplica o mesmo contador e aceita um reprocessamento posterior");
+
+    await queue.add(
+      "process-comment",
+      { ...jobData, instagramAccountId: "business_other" },
+      { jobId: "manual_retry_other_workspace_1" }
+    );
+    const snapshot = summarizeWorkspaceQueueJobs(
+      {
+        waiting: await queue.getJobs("wait", 0, 99, true),
+        active: await queue.getJobs("active", 0, 99, true),
+        delayed: await queue.getJobs("delayed", 0, 99, true),
+        failed: await queue.getJobs("failed", 0, 99, true),
+      },
+      ["business_1"]
+    );
+    assert.deepEqual(snapshot.counts, {
+      waiting: 2,
+      active: 0,
+      delayed: 0,
+      failed: 0,
+    });
+    console.log("✓ Métricas Redis excluem jobs pertencentes a outro workspace");
   } finally {
     await queue.obliterate({ force: true }).catch(() => {});
     await queue.close();

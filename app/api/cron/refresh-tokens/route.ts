@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { decryptToken, encryptToken } from "@/lib/meta/oauth";
 import { refreshLongLivedToken } from "@/lib/meta/client";
+import {
+  clearAutomationCredentialFailures,
+  sanitizeAutomationError,
+} from "@/lib/automations/operational-state";
 
 const DAYS_BEFORE_EXPIRY = 10;
 
@@ -9,7 +13,7 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET || process.env.NEXTAUTH_SECRET;
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json(
       { success: false, error: "Unauthorized" },
       { status: 401 }
@@ -60,12 +64,19 @@ export async function GET(request: NextRequest) {
       const encryptedToken = encryptToken(newToken);
       const newExpiry = new Date(Date.now() + expiresIn * 1000);
 
-      await prisma.instagramAccount.update({
-        where: { id: account.id },
-        data: {
-          accessToken: encryptedToken,
-          tokenExpiresAt: newExpiry,
-        },
+      await prisma.$transaction(async (transaction) => {
+        await transaction.instagramAccount.update({
+          where: { id: account.id, workspaceId: account.workspaceId },
+          data: {
+            accessToken: encryptedToken,
+            tokenExpiresAt: newExpiry,
+          },
+        });
+        await clearAutomationCredentialFailures(
+          transaction,
+          account.workspaceId,
+          account.id
+        );
       });
 
       results.push({
@@ -74,7 +85,7 @@ export async function GET(request: NextRequest) {
         status: "refreshed",
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      const errorMessage = sanitizeAutomationError(err);
       await prisma.operationalEvent.create({
         data: {
           workspaceId: account.workspaceId,

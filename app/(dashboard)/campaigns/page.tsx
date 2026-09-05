@@ -11,6 +11,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import { readCache, writeCache } from "@/lib/client-cache";
+import { formatDateTime } from "@/lib/i18n";
+
+type OperationalState = "ACTIVE" | "PAUSED" | "WAITING_FOR_POST" | "ERROR";
+
+const operationalStateStyles: Record<
+  OperationalState,
+  { badge: string; label: string }
+> = {
+  ACTIVE: { badge: "bg-success/10 text-success", label: "Ativa" },
+  PAUSED: { badge: "bg-zinc-500/10 text-muted", label: "Pausada" },
+  WAITING_FOR_POST: {
+    badge: "bg-amber-500/10 text-warning",
+    label: "Aguardando publicação",
+  },
+  ERROR: { badge: "bg-error/10 text-error", label: "Com erro" },
+};
 
 interface Campaign {
   id: string;
@@ -60,6 +76,14 @@ interface Campaign {
     ctr: number;
     topKeywords: { keyword: string; count: number }[];
   };
+  operationalState: {
+    state: OperationalState;
+    label: string;
+    reason: string;
+    needsAttention: boolean;
+    lastRunAt: string | null;
+    consecutiveFailures: number;
+  };
 }
 
 export default function CampaignsPage() {
@@ -81,9 +105,11 @@ export default function CampaignsPage() {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused">(
-    "all"
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "paused" | "waiting" | "error"
+  >("all");
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAutomations = useCallback(async () => {
     try {
@@ -96,9 +122,18 @@ export default function CampaignsPage() {
         { cache: "no-store" }
       );
       const data = await res.json();
-      if (data.success) setAutomations(data.data);
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? "Não foi possível carregar as campanhas");
+      }
+      setAutomations(data.data);
+      setError(null);
     } catch (err) {
       console.error("Failed to fetch campaigns:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível carregar as campanhas"
+      );
     } finally {
       setLoading(false);
     }
@@ -198,17 +233,26 @@ export default function CampaignsPage() {
   }
 
   async function toggleActive(id: string, isActive: boolean) {
+    setActionId(id);
+    setError(null);
     try {
-      await fetch(`/api/automations?id=${id}`, {
+      const response = await fetch(`/api/automations?id=${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !isActive }),
       });
-      setAutomations((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, isActive: !isActive } : a))
-      );
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Não foi possível alterar a campanha");
+      }
+      await fetchAutomations();
     } catch (err) {
       console.error("Failed to toggle:", err);
+      setError(
+        err instanceof Error ? err.message : "Não foi possível alterar a campanha"
+      );
+    } finally {
+      setActionId(null);
     }
   }
 
@@ -289,8 +333,11 @@ export default function CampaignsPage() {
 
   const query = search.trim().toLowerCase();
   const filtered = automations.filter((a) => {
-    if (statusFilter === "active" && !a.isActive) return false;
-    if (statusFilter === "paused" && a.isActive) return false;
+    const operationalState = a.operationalState.state;
+    if (statusFilter === "active" && operationalState !== "ACTIVE") return false;
+    if (statusFilter === "paused" && operationalState !== "PAUSED") return false;
+    if (statusFilter === "waiting" && operationalState !== "WAITING_FOR_POST") return false;
+    if (statusFilter === "error" && operationalState !== "ERROR") return false;
     if (!query) return true;
     return (
       a.name.toLowerCase().includes(query) ||
@@ -344,8 +391,8 @@ export default function CampaignsPage() {
             placeholder="Buscar por nome, palavra-chave ou mensagem…"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
           />
-          <div className="inline-flex shrink-0 rounded-lg bg-surface p-1">
-            {(["all", "active", "paused"] as const).map((s) => (
+          <div className="flex shrink-0 flex-wrap rounded-lg bg-surface p-1">
+            {(["all", "active", "paused", "waiting", "error"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -356,10 +403,24 @@ export default function CampaignsPage() {
                     : "text-muted hover:text-foreground"
                 }`}
               >
-                {s === "all" ? "Todas" : s === "active" ? "Ativas" : "Pausadas"}
+                {s === "all"
+                  ? "Todas"
+                  : s === "active"
+                    ? "Ativas"
+                    : s === "paused"
+                      ? "Pausadas"
+                      : s === "waiting"
+                        ? "Aguardando"
+                        : "Com erro"}
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded border border-error/25 bg-error/10 px-4 py-3 text-sm text-error">
+          {error}
         </div>
       )}
 
@@ -390,6 +451,7 @@ export default function CampaignsPage() {
       <div className="space-y-3">
         {filtered.map((auto) => {
           const videoUrl = auto.postId ? videos[auto.postId] : undefined;
+          const stateStyle = operationalStateStyles[auto.operationalState.state];
           return (
           <div
             key={auto.id}
@@ -447,19 +509,10 @@ export default function CampaignsPage() {
                     @{auto.instagramAccount.username}
                   </span>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      auto.isActive
-                        ? "bg-success/10 text-success"
-                        : "bg-zinc-500/10 text-muted"
-                    }`}
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${stateStyle.badge}`}
                   >
-                    {auto.isActive ? "Ativa" : "Pausada"}
+                    {stateStyle.label}
                   </span>
-                  {auto.pendingNextReel && (
-                    <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-warning">
-                      Aguardando o próximo reel
-                    </span>
-                  )}
                   {auto.requireFollow && (
                     <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
                       Exige seguir
@@ -486,6 +539,17 @@ export default function CampaignsPage() {
 
                 {/* DM preview */}
                 <p className="text-sm text-muted truncate">&ldquo;{auto.dmMessage}&rdquo;</p>
+
+                <p
+                  className={`mt-2 text-xs ${
+                    auto.operationalState.needsAttention ? "text-error" : "text-muted"
+                  }`}
+                >
+                  {auto.operationalState.reason}
+                  {auto.operationalState.lastRunAt
+                    ? ` Última execução: ${formatDateTime(auto.operationalState.lastRunAt)}.`
+                    : ""}
+                </p>
 
                 {/* Tracked link sent */}
                 {auto.trackedLinks[0]?.trackedUrl && (
@@ -543,10 +607,14 @@ export default function CampaignsPage() {
                 )}
                 {/* Toggle */}
                 <button
+                  type="button"
+                  aria-label={auto.isActive ? "Pausar campanha" : "Ativar campanha"}
+                  disabled={actionId === auto.id}
                   onClick={() => toggleActive(auto.id, auto.isActive)}
                   className={`
                     relative w-11 h-6 rounded-full transition-colors
                     ${auto.isActive ? "bg-accent" : "bg-zinc-300"}
+                    disabled:cursor-wait disabled:opacity-50
                   `}
                 >
                   <span

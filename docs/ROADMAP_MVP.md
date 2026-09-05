@@ -33,7 +33,7 @@ Objetivo: tornar a base confiável para desenvolvimento do produto.
 - [x] Iniciar aplicação web e worker simultaneamente.
 - [x] Remover alertas críticos por atualização de dependências, sem regressões.
 - [ ] Tratar ou aceitar formalmente os 8 alertas altos bloqueados por dependências upstream.
-- [ ] Adicionar testes integrados com PostgreSQL e Redis.
+- [ ] Adicionar testes integrados com PostgreSQL e Redis. (PostgreSQL coberto no CRM; Redis ainda pendente.)
 - [ ] Criar teste end-to-end mínimo de login e criação de campanha.
 
 Critério de saída: ambiente reproduzível, auditoria de segurança tratada, CI verde e fluxo local validado com serviços reais.
@@ -120,16 +120,26 @@ Critério de saída: campanhas processam eventos duplicados, falhas e rate limit
 
 Objetivo: transformar interações isoladas em relacionamento persistente.
 
-- [ ] Criar entidades `Contact`, `Conversation`, `Message`, `Tag` e `CustomField`.
-- [ ] Migrar ou associar logs existentes aos contatos.
-- [ ] Criar perfil do contato com histórico de comentários, DMs e cliques.
-- [ ] Permitir tags manuais e automáticas.
+- [ ] Criar entidades `Contact`, `Conversation`, `Message`, `Tag` e `CustomField`. (`Contact` concluído.)
+- [x] Migrar ou associar logs existentes aos contatos.
+- [ ] Criar perfil do contato com histórico de comentários, DMs e cliques. (Comentários e respostas de automação concluídos; cliques aguardam identificação do destinatário.)
+- [ ] Permitir tags manuais e automáticas. (Etiquetas manuais concluídas.)
 - [ ] Criar segmentos por origem, campanha, engajamento e data.
 - [ ] Evoluir o inbox com atribuição, status, busca e notas.
 - [ ] Aplicar a janela de mensagens da Meta na interface.
 - [ ] Implementar exportação e exclusão de dados pessoais.
 
 Critério de saída: a equipe consegue identificar um contato, acompanhar seu histórico e responder com contexto.
+
+Progresso validado em 5 de setembro de 2026:
+
+- Perfis de contato são projetados automaticamente dos logs existentes e dos novos eventos, sem alterar o fluxo oficial da Meta.
+- A identidade composta por workspace, conta do Instagram e usuário impede colisões entre empresas e contas.
+- A lista oferece busca, filtros, paginação e acesso ao perfil com histórico das automações.
+- Proprietários e administradores editam etiquetas e anotações; membros possuem acesso somente de leitura.
+- Edição concorrente retorna conflito e preserva o rascunho local para comparação com a versão mais recente.
+- O PostgreSQL foi validado com todas as 23 migrations, backfill, eventos fora de ordem, concorrência, cascata e rollback atômico em schema descartável.
+- Limitações e rollback operacional estão documentados em `docs/CONTACTS.md`.
 
 ## Marco 5 — Planos e cobrança
 

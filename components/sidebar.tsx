@@ -20,6 +20,7 @@ const navIcons: Record<DashboardNavKey, React.ReactNode> = {
   dashboard: <path d="M4 13h6V4H4v9Zm10 7h6V11h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z" />,
   overview: <path d="M4 19V9m5 10V5m6 14v-7m5 7V3" />,
   inbox: <path d="M4 6h16v11H8l-4 4V6Zm4 4h8m-8 3h5" />,
+  contacts: <path d="M16 20v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2m12-8a3 3 0 0 1 3 3v3M10 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm7 1a3 3 0 0 1 0 6" />,
   campaigns: <path d="m5 16 5-5m0 0 3-3 6 6-3 3-6-6Zm-5 5h4m11-15 2-2m3 6h3" />,
   logs: <path d="M6 4h12v16H6V4Zm4 4h4m-4 4h5m-5 4h3" />,
   settings: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-5v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" />,

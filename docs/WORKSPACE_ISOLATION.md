@@ -5,7 +5,7 @@ O ReplyFlow trata o workspace ativo como a fronteira de autorização para todos
 ## Invariantes
 
 1. Rotas autenticadas resolvem o workspace pelo servidor com `getCurrentWorkspaceId` ou `getCurrentWorkspaceContext`.
-2. Leituras de automações, logs, contas do Instagram, métricas, equipe e auditoria incluem o `workspaceId` ativo.
+2. Leituras de automações, contatos, logs, contas do Instagram, métricas, equipe e auditoria incluem o `workspaceId` ativo.
 3. Alterações e exclusões repetem `workspaceId` no próprio `WHERE`, mesmo depois de uma leitura autorizada.
 4. IDs de contas do Instagram recebidos do cliente são resolvidos por `getWorkspaceInstagramAccount`, que exige a combinação conta + workspace.
 5. Alertas do worker carregam `workspaceId` e são filtrados antes de chegar ao diagnóstico. Alertas antigos sem escopo não são exibidos.
@@ -39,4 +39,4 @@ npm test
 npm run build -- --webpack
 ```
 
-Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria e filtragem de alertas do worker.
+Os testes de isolamento cobrem seleção de workspace, conexão de conta, papéis, convites, auditoria, contatos e filtragem de alertas do worker. O CRM também executa `npm run test:contacts-db` contra um schema PostgreSQL descartável para validar a chave estrangeira composta, o backfill e a ingestão concorrente.

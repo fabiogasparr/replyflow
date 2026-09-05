@@ -2,14 +2,30 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**', 'fix/**', 'chore/**']
   pull_request:
     branches: [main]
 
 jobs:
   test:
-    name: TypeScript checks
+    name: Application and database checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: replyflow_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d replyflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -27,7 +43,7 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/instrareply
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
 
       - name: Typecheck
         run: npm run typecheck
@@ -38,17 +54,22 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Verify contact migration and database isolation
+        run: npm run test:contacts-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
       - name: Build
         run: npm run build
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/instrareply
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
           REDIS_URL: redis://localhost:6379
           NEXTAUTH_URL: http://localhost:3000
           NEXTAUTH_SECRET: test-secret-for-ci-build
           CRON_SECRET: test-secret-for-ci-cron
           ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           RESEND_API_KEY: re_test
-          EMAIL_FROM: "InstaReply <login@example.com>"
+          EMAIL_FROM: "ReplyFlow <login@example.com>"
           META_GRAPH_API_VERSION: v25.0
           INSTAGRAM_APP_ID: test
           INSTAGRAM_APP_SECRET: test

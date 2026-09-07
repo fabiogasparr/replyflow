@@ -110,7 +110,7 @@ Objetivo: consolidar o principal caso de uso comercial.
 - [ ] Preservar respostas públicas, mensagens privadas e personalização.
 - [ ] Melhorar botões, links rastreáveis e follow-up.
 - [x] Criar estados claros para pausado, ativo, com erro e aguardando publicação.
-- [ ] Dividir o worker em handlers menores. (Entrega compartilhada e follow-up concluídos; comentário, postback e mensagem recebida pendentes.)
+- [ ] Dividir o worker em handlers menores. (Entrega compartilhada, follow-up e postback concluídos; comentário e mensagem recebida pendentes.)
 - [x] Criar fila de falhas e reprocessamento manual seguro.
 - [x] Exibir saúde do worker e atraso das filas no painel.
 - [x] Testar idempotência, concorrência e limites com Redis real.

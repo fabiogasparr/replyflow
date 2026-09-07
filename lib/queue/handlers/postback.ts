@@ -23,6 +23,14 @@ import {
   formatWorkerError as formatError,
   sendRevealDirectMessage,
 } from "../delivery";
+import {
+  BUTTON_TAP_LOG_TEXT,
+  DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
+  DEFAULT_FOLLOW_PROMPT_MESSAGE,
+  INVALID_INSTAGRAM_TOKEN_ERROR,
+  MISSING_INSTAGRAM_TOKEN_ERROR,
+  monthlyDmLimitError,
+} from "../user-facing-copy";
 
 /**
  * Deliver the reveal message after a user taps an opening DM's button.
@@ -61,7 +69,7 @@ export async function processPostback(
   if (!automation.instagramAccount.accessToken) {
     await recordAutomationFailure(
       automation.id,
-      new Error("No Instagram access token available")
+      new Error(MISSING_INSTAGRAM_TOKEN_ERROR)
     );
     return;
   }
@@ -100,7 +108,7 @@ export async function processPostback(
   } catch {
     await recordAutomationFailure(
       automation.id,
-      new Error("Failed to decrypt Instagram access token")
+      new Error(INVALID_INSTAGRAM_TOKEN_ERROR)
     );
     return;
   }
@@ -117,8 +125,7 @@ export async function processPostback(
       if (fallback) return;
       const promptText = renderMessageWithoutLink({
         message:
-          automation.followPromptMessage ||
-          "quick favor before i send your link. i don't make any money from this, it's free. if you want to support me, just don't unfollow after, and star the repo on github if it helps you. tap the button once you're following and i'll send it over",
+          automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE,
         commenterName,
       });
       try {
@@ -127,7 +134,8 @@ export async function processPostback(
           automation.instagramAccount.instagramId,
           userId,
           promptText,
-          automation.followPromptButtonLabel || "i'm following",
+          automation.followPromptButtonLabel ||
+            DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
           `followcheck:${automation.id}`
         );
       } catch (error) {
@@ -156,10 +164,10 @@ export async function processPostback(
         instagramAccountId: automation.instagramAccountId,
         commenterId: userId,
         commenterName,
-        commentText: "(button tap)",
+        commentText: BUTTON_TAP_LOG_TEXT,
         commentId: dedupeId,
         status: "SKIPPED_PLAN_LIMIT",
-        errorMessage: `Monthly DM limit reached (${usage.limit})`,
+        errorMessage: monthlyDmLimitError(usage.limit),
       },
       update: { ...postbackReplayData, status: "SKIPPED_PLAN_LIMIT" },
     });
@@ -209,7 +217,7 @@ export async function processPostback(
         instagramAccountId: automation.instagramAccountId,
         commenterId: userId,
         commenterName,
-        commentText: "(button tap)",
+        commentText: BUTTON_TAP_LOG_TEXT,
         commentId: dedupeId,
         status: "SENT",
         dmSentAt: new Date(),
@@ -257,7 +265,7 @@ export async function processPostback(
         instagramAccountId: automation.instagramAccountId,
         commenterId: userId,
         commenterName,
-        commentText: "(button tap)",
+        commentText: BUTTON_TAP_LOG_TEXT,
         commentId: dedupeId,
         status: "FAILED",
         errorMessage: formatError(error),

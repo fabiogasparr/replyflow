@@ -7,6 +7,10 @@ import {
   recordAutomationFailure,
   recordAutomationSuccess,
 } from "@/lib/automations/operational-state";
+import {
+  INVALID_INSTAGRAM_TOKEN_ERROR,
+  MISSING_INSTAGRAM_TOKEN_ERROR,
+} from "../user-facing-copy";
 import { renderMessageWithoutLink } from "@/lib/tracking/message";
 import { formatWorkerError } from "../delivery";
 
@@ -35,7 +39,7 @@ export async function processFollowUp(
   if (!automation.instagramAccount.accessToken) {
     await recordAutomationFailure(
       automation.id,
-      new Error("No Instagram access token available")
+      new Error(MISSING_INSTAGRAM_TOKEN_ERROR)
     );
     return;
   }
@@ -46,7 +50,7 @@ export async function processFollowUp(
   } catch {
     await recordAutomationFailure(
       automation.id,
-      new Error("Failed to decrypt Instagram access token")
+      new Error(INVALID_INSTAGRAM_TOKEN_ERROR)
     );
     return;
   }

@@ -24,6 +24,14 @@ import {
   formatWorkerError as formatError,
   sendRevealDirectMessage,
 } from "../delivery";
+import {
+  DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
+  DEFAULT_FOLLOW_PROMPT_MESSAGE,
+  INVALID_INSTAGRAM_TOKEN_ERROR,
+  MISSING_INSTAGRAM_TOKEN_ERROR,
+  inactiveAutomationError,
+  monthlyDmLimitError,
+} from "../user-facing-copy";
 
 /**
  * Reply to an inbound DM whose text matches a campaign's keywords.
@@ -68,7 +76,7 @@ export async function processMessage(
       },
       data: {
         status: "FAILED",
-        errorMessage: "Automation is no longer active for this Instagram account",
+        errorMessage: inactiveAutomationError,
       },
     });
     return;
@@ -132,17 +140,17 @@ export async function processMessage(
         create: {
           ...logBase,
           status: "FAILED",
-          errorMessage: "No Instagram access token available",
+          errorMessage: MISSING_INSTAGRAM_TOKEN_ERROR,
         },
         update: {
           ...logBase,
           status: "FAILED",
-          errorMessage: "No Instagram access token available",
+          errorMessage: MISSING_INSTAGRAM_TOKEN_ERROR,
         },
       });
       await recordAutomationFailure(
         automation.id,
-        new Error("No Instagram access token available")
+        new Error(MISSING_INSTAGRAM_TOKEN_ERROR)
       );
       continue;
     }
@@ -161,17 +169,17 @@ export async function processMessage(
         create: {
           ...logBase,
           status: "FAILED",
-          errorMessage: "Failed to decrypt Instagram access token",
+          errorMessage: INVALID_INSTAGRAM_TOKEN_ERROR,
         },
         update: {
           ...logBase,
           status: "FAILED",
-          errorMessage: "Failed to decrypt Instagram access token",
+          errorMessage: INVALID_INSTAGRAM_TOKEN_ERROR,
         },
       });
       await recordAutomationFailure(
         automation.id,
-        new Error("Failed to decrypt Instagram access token")
+        new Error(INVALID_INSTAGRAM_TOKEN_ERROR)
       );
       continue;
     }
@@ -209,12 +217,12 @@ export async function processMessage(
         create: {
           ...logBase,
           status: "SKIPPED_PLAN_LIMIT",
-          errorMessage: `Monthly DM limit reached (${usage.limit})`,
+          errorMessage: monthlyDmLimitError(usage.limit),
         },
         update: {
           ...logBase,
           status: "SKIPPED_PLAN_LIMIT",
-          errorMessage: `Monthly DM limit reached (${usage.limit})`,
+          errorMessage: monthlyDmLimitError(usage.limit),
         },
       });
       continue;
@@ -249,8 +257,7 @@ export async function processMessage(
       if (sendFollowPrompt) {
         const promptText = renderMessageWithoutLink({
           message:
-            automation.followPromptMessage ||
-            "Almost there! Follow me and tap the button below to grab your link 💛",
+            automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE,
           commenterName,
         });
         await sendDirectMessageWithButton(
@@ -258,7 +265,8 @@ export async function processMessage(
           automation.instagramAccount.instagramId,
           senderId,
           promptText,
-          automation.followPromptButtonLabel || "I'm following ✅",
+          automation.followPromptButtonLabel ||
+            DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
           `followcheck:${automation.id}`
         );
       } else {

@@ -8,6 +8,7 @@ import {
   buildTrackedUrl,
   extractFirstUrl,
   renderMessageWithTracking,
+  renderMessageWithoutLink,
   replaceUrlWithTrackedPlaceholder,
 } from "../lib/tracking/message";
 
@@ -37,6 +38,21 @@ describe("tracked link messages", () => {
         baseUrl: "https://manychat-alternative.com",
       })
     ).toBe("Hey Maya, grab it here: https://manychat-alternative.com/r/abc123");
+  });
+
+  it("uses a localized contact fallback in both message renderers", () => {
+    expect(
+      renderMessageWithTracking({
+        message: "Olá, {username}!",
+        commenterName: null,
+      })
+    ).toBe("Olá, você!");
+    expect(
+      renderMessageWithoutLink({
+        message: "Olá, {username}! {link}",
+        commenterName: null,
+      })
+    ).toBe("Olá, você!");
   });
 
   it("can replace a raw destination URL when the placeholder is missing", () => {

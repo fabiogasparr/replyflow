@@ -66,6 +66,7 @@ Progresso validado em 4 de setembro de 2026:
 - E-mails de acesso por SMTP e Resend usam o mesmo conteúdo em pt-BR, com testes de preservação do link, escape HTML e falha de entrega. Nenhum e-mail real foi enviado nesta validação.
 - A tela de acesso detecta placeholders antes de chamar Resend ou SMTP, desabilita o envio indisponível e traduz erros do Auth.js sem expor diagnósticos internos.
 - Mensagens de validação de campanhas usam português; requisições JSON malformadas retornam erro de entrada. Ainda há mensagens técnicas e textos de fallback do worker a revisar antes de considerar a tradução integral concluída.
+- Textos padrão do worker para contato, follow gate, botões, links e histórico operacional foram centralizados em pt-BR; a classificação de falhas preserva compatibilidade com registros antigos em inglês.
 
 ## Marco 2 — SaaS multiempresa
 
@@ -203,8 +204,8 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 
 ## Próxima execução recomendada
 
-1. Dividir o worker em handlers menores, preservando idempotência e sem alterar o contrato dos jobs.
-2. Concluir a tradução dos textos de fallback do worker e das mensagens técnicas exibidas ao usuário.
-3. Adicionar cobrança recorrente e aplicação de limites de uso por plano.
-4. Criar o painel administrativo global de clientes, planos e uso.
+1. Adicionar cobrança recorrente e aplicação de limites de uso por plano.
+2. Criar o painel administrativo global de clientes, planos e uso.
+3. Adicionar o teste end-to-end mínimo de acesso e criação de campanha.
+4. Concluir acessibilidade, responsividade e revisão jurídica das páginas públicas.
 5. Publicar cada módulo validado em uma branch própria, conforme autorização do responsável.

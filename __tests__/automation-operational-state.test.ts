@@ -105,6 +105,16 @@ describe("automation outcome projection", () => {
     expect(classifyAutomationFailure(new Error("No Instagram access token available"))).toBe(
       "CONFIGURATION"
     );
+    expect(
+      classifyAutomationFailure(
+        new Error("A conta do Instagram não possui uma credencial de acesso")
+      )
+    ).toBe("CONFIGURATION");
+    expect(
+      classifyAutomationFailure(
+        new Error("Não foi possível abrir a credencial da conta do Instagram")
+      )
+    ).toBe("CONFIGURATION");
     expect(classifyAutomationFailure(new Error("OAuth token expired"))).toBe(
       "AUTHENTICATION"
     );

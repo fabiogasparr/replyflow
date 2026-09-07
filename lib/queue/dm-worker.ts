@@ -13,14 +13,9 @@ import {
 } from "./client";
 import { prisma } from "@/lib/db/client";
 import {
-  MetaApiError,
-  RateLimitError,
-  TokenExpiredError,
   getUserFollowStatus,
   sendCommentReply,
-  sendDirectMessage,
   sendDirectMessageWithButton,
-  sendDirectMessageWithLinkButton,
   sendPrivateReply,
   sendPrivateReplyWithButton,
   sendPrivateReplyWithLinkButton,
@@ -38,159 +33,19 @@ import {
   recordAutomationSuccess,
 } from "@/lib/automations/operational-state";
 import {
-  buildTrackedUrl,
   renderMessageWithTracking,
   renderMessageWithoutLink,
 } from "@/lib/tracking/message";
+import {
+  buildInlineLinkFallback,
+  buildWorkerLinkButtons as buildLinkButtons,
+  formatWorkerError as formatError,
+  isTemplateRejection,
+  sendRevealDirectMessage,
+} from "./delivery";
+import { processFollowUp } from "./handlers/follow-up";
 
 const BACKOFF_DELAYS = [5 * 60 * 1000, 15 * 60 * 1000, 45 * 60 * 1000];
-
-function formatError(error: unknown): string {
-  if (error instanceof MetaApiError) {
-    return `Meta API Error ${error.code}: ${error.message}`;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "Unknown error";
-}
-
-// Meta rejections that a plain-text retry cannot fix: the send was refused for
-// the conversation, not for the button template. Retrying as text just burns
-// the attempt and — worse — overwrites the real error with a misleading one
-// ("invalid for a private reply", because the first attempt already used up the
-// comment's single allowed private reply).
-const NON_TEMPLATE_REJECTIONS = [
-  /outside of allowed window/i,
-  /invalid for a private reply/i,
-  /requested user cannot be found/i,
-];
-
-function isTemplateRejection(error: unknown): boolean {
-  if (error instanceof TokenExpiredError || error instanceof RateLimitError) {
-    return false;
-  }
-  const message = error instanceof Error ? error.message : "";
-  return !NON_TEMPLATE_REJECTIONS.some((pattern) => pattern.test(message));
-}
-
-type WorkerTrackedLink = {
-  slug: string;
-  label: string | null;
-  destinationUrl: string;
-};
-
-/**
- * Build the tappable link buttons for a DM. The first link uses the campaign's
- * `linkButtonLabel`; each additional link uses its own stored `label`. Capped at
- * Meta's 3-button limit for a button template.
- */
-function buildLinkButtons(
-  trackedLinks: WorkerTrackedLink[],
-  primaryLabel: string | null
-): { title: string; url: string }[] {
-  return trackedLinks.slice(0, 3).map((link, index) => ({
-    url: buildTrackedUrl(link.slug),
-    title: (index === 0 ? primaryLabel : link.label) || link.label || "Open link",
-  }));
-}
-
-/**
- * Fallback text when Meta rejects the button template: render the primary link
- * inline, then append any extra tracked URLs on their own lines so no link is
- * lost.
- */
-function buildInlineLinkFallback(
-  message: string,
-  commenterName: string | null | undefined,
-  trackedLinks: WorkerTrackedLink[],
-  bodyText: string
-): string {
-  const base =
-    renderMessageWithTracking({ message, commenterName, trackedLinks }) ||
-    bodyText;
-  const extraUrls = trackedLinks.slice(1).map((link) => buildTrackedUrl(link.slug));
-  return extraUrls.length > 0 ? `${base}\n${extraUrls.join("\n")}` : base;
-}
-
-type RevealAutomation = {
-  dmMessage: string;
-  linkButtonLabel: string | null;
-  trackedLinks: WorkerTrackedLink[];
-  instagramAccount: { instagramId: string };
-};
-
-/**
- * Deliver a campaign's reveal message as a direct message. Shared by the
- * button-tap (postback) path and the DM keyword-trigger path — both already
- * have an open conversation with the user, so neither uses a private reply.
- */
-async function sendRevealDirectMessage(
-  accessToken: string,
-  automation: RevealAutomation,
-  userId: string,
-  commenterName: string | null,
-  context: string
-): Promise<void> {
-  if (automation.trackedLinks.length === 0) {
-    await sendDirectMessage(
-      accessToken,
-      automation.instagramAccount.instagramId,
-      userId,
-      renderMessageWithTracking({
-        message: automation.dmMessage,
-        commenterName,
-        trackedLinks: automation.trackedLinks,
-      })
-    );
-    return;
-  }
-
-  // Try button template first; if Meta rejects it, fall back to inline links.
-  const bodyText =
-    renderMessageWithoutLink({
-      message: automation.dmMessage,
-      commenterName,
-    }) || "Here's your link:";
-  const buttons = buildLinkButtons(
-    automation.trackedLinks,
-    automation.linkButtonLabel
-  );
-
-  try {
-    await sendDirectMessageWithLinkButton(
-      accessToken,
-      automation.instagramAccount.instagramId,
-      userId,
-      bodyText,
-      buttons
-    );
-  } catch (buttonError) {
-    // A closed messaging window rejects the text retry too, so don't let it
-    // overwrite the original error with a misleading one.
-    if (!isTemplateRejection(buttonError)) throw buttonError;
-
-    console.log(
-      `[DM Worker] Button template rejected in ${context}, falling back to inline link:`,
-      formatError(buttonError)
-    );
-    try {
-      await sendDirectMessage(
-        accessToken,
-        automation.instagramAccount.instagramId,
-        userId,
-        buildInlineLinkFallback(
-          automation.dmMessage,
-          commenterName,
-          automation.trackedLinks,
-          bodyText
-        )
-      );
-    } catch {
-      throw buttonError;
-    }
-  }
-}
 
 async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
   const {
@@ -983,66 +838,6 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
     });
     await recordAutomationFailure(automation.id, error);
     throw error;
-  }
-}
-
-/**
- * Send the scheduled appreciation follow-up. Runs after its delay elapses.
- * Best-effort: if the message can't be delivered (e.g. the 24-hour messaging
- * window closed because the delay was long), it is logged, not retried forever.
- */
-async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
-  const { instagramAccountId, userId, automationId, commenterName } = job.data;
-
-  const automation = await prisma.automation.findFirst({
-    where: { id: automationId, isActive: true },
-    include: { instagramAccount: true },
-  });
-
-  if (
-    !automation ||
-    !automation.followUpEnabled ||
-    !automation.followUpMessage?.trim() ||
-    automation.instagramAccount.instagramId !== instagramAccountId
-  ) {
-    return;
-  }
-  if (!automation.instagramAccount.accessToken) {
-    await recordAutomationFailure(
-      automation.id,
-      new Error("No Instagram access token available")
-    );
-    return;
-  }
-
-  let accessToken: string;
-  try {
-    accessToken = decryptToken(automation.instagramAccount.accessToken);
-  } catch {
-    await recordAutomationFailure(
-      automation.id,
-      new Error("Failed to decrypt Instagram access token")
-    );
-    return;
-  }
-
-  try {
-    await sendDirectMessage(
-      accessToken,
-      automation.instagramAccount.instagramId,
-      userId,
-      renderMessageWithoutLink({
-        message: automation.followUpMessage,
-        commenterName: commenterName ?? null,
-      })
-    );
-    await recordAutomationSuccess(automation.id);
-  } catch (error) {
-    await recordAutomationFailure(automation.id, error);
-    console.log(
-      "[DM Worker] Failed to send follow-up message:",
-      formatError(error)
-    );
   }
 }
 

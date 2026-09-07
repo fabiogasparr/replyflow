@@ -109,7 +109,7 @@ Objetivo: consolidar o principal caso de uso comercial.
 - [ ] Preservar respostas públicas, mensagens privadas e personalização.
 - [ ] Melhorar botões, links rastreáveis e follow-up.
 - [x] Criar estados claros para pausado, ativo, com erro e aguardando publicação.
-- [ ] Dividir o worker em handlers menores.
+- [ ] Dividir o worker em handlers menores. (Entrega compartilhada e follow-up concluídos; comentário, postback e mensagem recebida pendentes.)
 - [x] Criar fila de falhas e reprocessamento manual seguro.
 - [x] Exibir saúde do worker e atraso das filas no painel.
 - [x] Testar idempotência, concorrência e limites com Redis real.
@@ -124,6 +124,7 @@ Progresso validado em 5 de setembro de 2026:
 - Reconectar a conta ou renovar o token remove imediatamente erros de credencial da conta e do workspace corretos, dentro da mesma transação.
 - Os diagnósticos persistidos são higienizados e não são enviados ao navegador; a API retorna somente explicações estáveis em português.
 - A migration aditiva foi aprovada depois das 26 migrations reais em um schema PostgreSQL descartável. Detalhes e rollback estão em `docs/AUTOMATION_OPERATIONAL_STATE.md`.
+- A modularização do worker começou pelo núcleo compartilhado de entrega e pelo handler isolado de follow-up, sem alterar os contratos da fila. Impacto e rollback estão em `docs/WORKER_MODULES.md`.
 
 ## Marco 4 — Contatos e conversas
 

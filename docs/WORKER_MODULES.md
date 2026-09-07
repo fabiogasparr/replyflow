@@ -34,6 +34,12 @@ O fallback de leitura continua conservador: não repete uma entrega já registra
 
 O follow gate permanece fechado no primeiro contato: somente a confirmação explícita de que a pessoa segue a conta libera o link. A mensagem de orientação e a entrega final compartilham a mesma reserva do plano, enquanto o follow-up só é agendado depois que o link realmente foi enviado.
 
+### Comentário
+
+`lib/queue/handlers/comment.ts` contém o pipeline de comentários. A seleção considera a mídia do anúncio, a publicação original e campanhas de qualquer publicação, sempre dentro da conta do Instagram presente no evento. O módulo preserva a única resposta privada permitida pela Meta por comentário, sem impedir respostas públicas de campanhas diferentes.
+
+A tentativa de entrega é persistida antes da chamada externa, a reserva mensal é devolvida quando o limite horário impede o envio e o requeue usa uma chave determinística. Respostas públicas continuam independentes da mensagem privada e idempotentes por `publicReplySentAt`.
+
 ## Compatibilidade e segurança
 
 - o roteador e a configuração do BullMQ continuam em `lib/queue/dm-worker.ts`;
@@ -44,8 +50,9 @@ O follow gate permanece fechado no primeiro contato: somente a confirmação exp
 - os testes garantem que um `instagramAccountId` diferente interrompe o follow-up antes da abertura do token.
 - os testes garantem a mesma fronteira de conta para postbacks e preservam o comportamento integrado do clique, do follow gate, do limite do plano e do fallback de leitura.
 - os testes garantem deduplicação por mensagem, interrupção de replays ambíguos, follow gate e projeção de falhas no handler de DMs recebidas.
+- os testes garantem seleção por mídia e conta, deduplicação entre campanhas, requeue determinístico e proteção contra replays ambíguos no handler de comentários.
 
-O handler de comentário será extraído em uma entrega seguinte, mantendo os testes de regressão do pipeline completo.
+Com os quatro handlers extraídos, `lib/queue/dm-worker.ts` fica responsável apenas por rotear jobs, configurar concorrência e backoff e registrar falhas operacionais do processo.
 
 ## Validação e rollback
 

@@ -22,6 +22,12 @@ Uma rejeição por token, limite, janela fechada, comentário já respondido ou 
 
 O follow-up permanece **best-effort**. Se a janela da Meta estiver fechada, a falha fica visível no estado e nos logs do worker, mas o job não entra em uma repetição infinita.
 
+### Clique em botão e fallback de leitura
+
+`lib/queue/handlers/postback.ts` contém a entrega iniciada pelo botão da mensagem de abertura e pelo fallback de leitura. O módulo repete a fronteira da conta externa antes de abrir o token, respeita o follow gate, reserva e devolve o uso mensal e agenda o follow-up com uma chave determinística.
+
+O fallback de leitura continua conservador: não repete uma entrega já registrada, não contorna o requisito de seguir a conta e não transforma uma janela de mensagens fechada em falha operacional ou retry inútil. O clique real continua propagando a falha para a política de tentativas da fila.
+
 ## Compatibilidade e segurança
 
 - o roteador e a configuração do BullMQ continuam em `lib/queue/dm-worker.ts`;
@@ -30,8 +36,9 @@ O follow-up permanece **best-effort**. Se a janela da Meta estiver fechada, a fa
 - o worker continua sendo o único processo que efetua esses envios;
 - a interface web pode ser implantada antes ou depois deste worker;
 - os testes garantem que um `instagramAccountId` diferente interrompe o follow-up antes da abertura do token.
+- os testes garantem a mesma fronteira de conta para postbacks e preservam o comportamento integrado do clique, do follow gate, do limite do plano e do fallback de leitura.
 
-Os handlers de comentário, postback e mensagem recebida serão extraídos em entregas seguintes, cada um mantendo os testes de regressão do pipeline completo.
+Os handlers de comentário e mensagem recebida serão extraídos em entregas seguintes, cada um mantendo os testes de regressão do pipeline completo.
 
 ## Validação e rollback
 

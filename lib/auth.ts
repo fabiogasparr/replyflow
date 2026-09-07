@@ -55,6 +55,7 @@ export const authConfig = {
   pages: {
     signIn: "/login",
     verifyRequest: "/verify-request",
+    error: "/login/error",
   },
   session: {
     strategy: "database",

@@ -104,6 +104,8 @@ Copy `.env.example` to `.env` for local work, or set these in Vercel and Railway
 
 `ENCRYPTION_KEY` must be exactly 64 hex characters or the app throws on boot.
 
+O ReplyFlow não tenta enviar links de acesso enquanto `RESEND_API_KEY`, `EMAIL_FROM` ou `EMAIL_SERVER` ainda contiverem valores de exemplo. Nessa situação, `/login` explica o bloqueio e desabilita o formulário. Depois de configurar um provedor real, reinicie a aplicação web. Consulte `docs/AUTHENTICATION_READINESS.md` para diagnóstico e rollback.
+
 Optional, for tuning the polling reconciler (defaults are fine to start):
 
 | Variable | Default | What it does |

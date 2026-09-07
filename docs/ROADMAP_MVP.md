@@ -64,6 +64,7 @@ Progresso validado em 4 de setembro de 2026:
 - Início, campanhas, desempenho, conversas, histórico e diagnóstico passaram a usar textos e formatos brasileiros; a tradução das superfícies restantes continua em andamento.
 - Configurações, convites, relatórios compartilhados, páginas públicas e os oito modelos de campanha foram traduzidos; contraste e apresentação em telas estreitas receberam correções.
 - E-mails de acesso por SMTP e Resend usam o mesmo conteúdo em pt-BR, com testes de preservação do link, escape HTML e falha de entrega. Nenhum e-mail real foi enviado nesta validação.
+- A tela de acesso detecta placeholders antes de chamar Resend ou SMTP, desabilita o envio indisponível e traduz erros do Auth.js sem expor diagnósticos internos.
 - Mensagens de validação de campanhas usam português; requisições JSON malformadas retornam erro de entrada. Ainda há mensagens técnicas e textos de fallback do worker a revisar antes de considerar a tradução integral concluída.
 
 ## Marco 2 — SaaS multiempresa

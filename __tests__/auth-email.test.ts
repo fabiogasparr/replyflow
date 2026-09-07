@@ -9,11 +9,24 @@ const params = {
   identifier: "test@example.com",
   url: 'http://localhost:3000/api/auth/callback/resend?token=test&email=a%40example.com',
   expires: new Date("2026-09-05T00:00:00Z"),
-  provider: { id: "resend", type: "email", name: "Resend", from: "login@example.com", maxAge: 86400, apiKey: "test-key", sendVerificationRequest: sendResendVerification },
+  provider: { id: "resend", type: "email", name: "Resend", from: "acesso@replyflow.com.br", maxAge: 86400, apiKey: "re_1234567890abcdef", sendVerificationRequest: sendResendVerification },
   token: "test",
   theme: {},
   request: new Request("http://localhost:3000"),
 } satisfies Parameters<typeof sendResendVerification>[0];
+
+const smtpParams = {
+  ...params,
+  provider: {
+    id: "nodemailer",
+    type: "email",
+    name: "Nodemailer",
+    from: "acesso@replyflow.com.br",
+    maxAge: 86400,
+    server: "smtps://user:secret@mail.replyflow.test:465",
+    sendVerificationRequest: sendSmtpVerification,
+  },
+} satisfies Parameters<typeof sendSmtpVerification>[0];
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => vi.unstubAllGlobals());
@@ -31,12 +44,12 @@ describe("sign-in email", () => {
 
   it("sends the same localized content through SMTP", async () => {
     sendMail.mockResolvedValue({ rejected: [], pending: [] });
-    await sendSmtpVerification(params);
+    await sendSmtpVerification(smtpParams);
     expect(sendMail).toHaveBeenCalledWith({
-      to: params.identifier, from: params.provider.from, ...buildSignInEmail(params.url),
+      to: smtpParams.identifier, from: smtpParams.provider.from, ...buildSignInEmail(smtpParams.url),
     });
-    sendMail.mockResolvedValue({ rejected: [params.identifier] });
-    await expect(sendSmtpVerification(params)).rejects.toThrow("Não foi possível enviar");
+    sendMail.mockResolvedValue({ rejected: [smtpParams.identifier] });
+    await expect(sendSmtpVerification(smtpParams)).rejects.toThrow("Não foi possível enviar");
   });
 
   it("passes the verification link to Resend and rejects failed deliveries without exposing its token", async () => {
@@ -49,5 +62,26 @@ describe("sign-in email", () => {
     });
     fetchMock.mockResolvedValue({ ok: false, status: 429 });
     await expect(sendResendVerification(params)).rejects.toThrow("(429)");
+  });
+
+  it("blocks placeholder provider values before any external delivery call", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      sendResendVerification({
+        ...params,
+        provider: { ...params.provider, apiKey: "re_..." },
+      })
+    ).rejects.toThrow("não está configurado");
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await expect(
+      sendSmtpVerification({
+        ...smtpParams,
+        provider: { ...smtpParams.provider, server: "https://mail.test" },
+      })
+    ).rejects.toThrow("não está configurado");
+    expect(sendMail).not.toHaveBeenCalled();
   });
 });

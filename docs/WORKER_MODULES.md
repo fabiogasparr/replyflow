@@ -28,6 +28,12 @@ O follow-up permanece **best-effort**. Se a janela da Meta estiver fechada, a fa
 
 O fallback de leitura continua conservador: não repete uma entrega já registrada, não contorna o requisito de seguir a conta e não transforma uma janela de mensagens fechada em falha operacional ou retry inútil. O clique real continua propagando a falha para a política de tentativas da fila.
 
+### Mensagem recebida
+
+`lib/queue/handlers/message.ts` contém o gatilho por DM recebida. A busca nasce limitada à conta externa do evento, aplica as palavras-chave da campanha e usa `dm:<messageId>` como chave de deduplicação. Antes da chamada à Meta, o handler registra `deliveryAttemptedAt`; um resultado ambíguo não é reenviado automaticamente.
+
+O follow gate permanece fechado no primeiro contato: somente a confirmação explícita de que a pessoa segue a conta libera o link. A mensagem de orientação e a entrega final compartilham a mesma reserva do plano, enquanto o follow-up só é agendado depois que o link realmente foi enviado.
+
 ## Compatibilidade e segurança
 
 - o roteador e a configuração do BullMQ continuam em `lib/queue/dm-worker.ts`;
@@ -37,8 +43,9 @@ O fallback de leitura continua conservador: não repete uma entrega já registra
 - a interface web pode ser implantada antes ou depois deste worker;
 - os testes garantem que um `instagramAccountId` diferente interrompe o follow-up antes da abertura do token.
 - os testes garantem a mesma fronteira de conta para postbacks e preservam o comportamento integrado do clique, do follow gate, do limite do plano e do fallback de leitura.
+- os testes garantem deduplicação por mensagem, interrupção de replays ambíguos, follow gate e projeção de falhas no handler de DMs recebidas.
 
-Os handlers de comentário e mensagem recebida serão extraídos em entregas seguintes, cada um mantendo os testes de regressão do pipeline completo.
+O handler de comentário será extraído em uma entrega seguinte, mantendo os testes de regressão do pipeline completo.
 
 ## Validação e rollback
 

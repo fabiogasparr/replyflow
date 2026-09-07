@@ -57,6 +57,8 @@ const CONFIGURATION_PATTERNS = [
   /no instagram access token/i,
   /decrypt.*access token/i,
   /missing.*credential/i,
+  /não possui uma credencial de acesso/i,
+  /não foi possível abrir a credencial/i,
 ];
 const RATE_LIMIT_PATTERNS = [
   /rate.?limit/i,
@@ -67,7 +69,7 @@ const RATE_LIMIT_PATTERNS = [
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  return "Unknown platform error";
+  return "Falha desconhecida na plataforma";
 }
 
 export function classifyAutomationFailure(error: unknown): AutomationFailureKind {

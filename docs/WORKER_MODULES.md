@@ -54,6 +54,12 @@ A tentativa de entrega é persistida antes da chamada externa, a reserva mensal 
 
 Com os quatro handlers extraídos, `lib/queue/dm-worker.ts` fica responsável apenas por rotear jobs, configurar concorrência e backoff e registrar falhas operacionais do processo.
 
+## Textos padrão em português
+
+`lib/queue/user-facing-copy.ts` centraliza os textos que podem chegar ao contato ou aparecer no histórico operacional: nome substituto, orientação para seguir o perfil, botão de confirmação, fallback de link, limites e deduplicação. Mensagens personalizadas já salvas nas campanhas não são modificadas.
+
+A classificação operacional aceita tanto as mensagens históricas em inglês quanto as novas mensagens em português. Assim, registros antigos continuam classificados sem exigir migration ou reprocessamento do banco.
+
 ## Validação e rollback
 
 Execute:

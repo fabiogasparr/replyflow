@@ -46,7 +46,7 @@ export function renderMessageWithoutLink({
   commenterName?: string | null;
 }) {
   return message
-    .replace(/\{username\}/gi, commenterName ?? "there")
+    .replace(/\{username\}/gi, commenterName ?? DEFAULT_CONTACT_NAME)
     .replace(/\s*\{link\}\s*/gi, " ")
     .trim();
 }
@@ -72,7 +72,10 @@ export function renderMessageWithTracking({
   trackedLinks?: MessageTrackedLink[];
   baseUrl?: string;
 }) {
-  let rendered = message.replace(/\{username\}/gi, commenterName ?? "there");
+  let rendered = message.replace(
+    /\{username\}/gi,
+    commenterName ?? DEFAULT_CONTACT_NAME
+  );
   const primaryLink = trackedLinks?.[0];
 
   if (!primaryLink) return rendered;
@@ -92,3 +95,4 @@ export function renderMessageWithTracking({
 
   return rendered;
 }
+import { DEFAULT_CONTACT_NAME } from "@/lib/queue/user-facing-copy";

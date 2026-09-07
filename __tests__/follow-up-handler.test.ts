@@ -86,7 +86,7 @@ describe("follow-up queue handler", () => {
     expect(mocks.recordAutomationFailure).toHaveBeenCalledWith(
       "automation_1",
       expect.objectContaining({
-        message: "No Instagram access token available",
+        message: "A conta do Instagram não possui uma credencial de acesso",
       })
     );
     expect(mocks.sendDirectMessage).not.toHaveBeenCalled();

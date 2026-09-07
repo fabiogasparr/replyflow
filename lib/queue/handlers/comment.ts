@@ -29,6 +29,18 @@ import {
   formatWorkerError as formatError,
   isTemplateRejection,
 } from "../delivery";
+import {
+  DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
+  DEFAULT_FOLLOW_PROMPT_MESSAGE,
+  DEFAULT_LINK_MESSAGE,
+  INVALID_INSTAGRAM_TOKEN_ERROR,
+  MISSING_INSTAGRAM_TOKEN_ERROR,
+  hourlyDmLimitError,
+  hourlyDmRetryMessage,
+  inactiveAutomationError,
+  monthlyDmLimitError,
+  privateReplyAlreadyUsedError,
+} from "../user-facing-copy";
 
 export async function processComment(
   job: Job<ProcessCommentJob>
@@ -97,7 +109,7 @@ export async function processComment(
       },
       data: {
         status: "FAILED",
-        errorMessage: "Automation is no longer active for this Instagram account",
+        errorMessage: inactiveAutomationError,
       },
     });
     return;
@@ -165,17 +177,17 @@ export async function processComment(
           commentId,
           matchedKeyword: matchResult.matchedKeyword,
           status: "FAILED",
-          errorMessage: "No Instagram access token available",
+          errorMessage: MISSING_INSTAGRAM_TOKEN_ERROR,
         },
         update: {
           ...replayData,
           status: "FAILED",
-          errorMessage: "No Instagram access token available",
+          errorMessage: MISSING_INSTAGRAM_TOKEN_ERROR,
         },
       });
       await recordAutomationFailure(
         automation.id,
-        new Error("No Instagram access token available")
+        new Error(MISSING_INSTAGRAM_TOKEN_ERROR)
       );
       continue;
     }
@@ -202,17 +214,17 @@ export async function processComment(
           commentId,
           matchedKeyword: matchResult.matchedKeyword,
           status: "FAILED",
-          errorMessage: "Failed to decrypt Instagram access token",
+          errorMessage: INVALID_INSTAGRAM_TOKEN_ERROR,
         },
         update: {
           ...replayData,
           status: "FAILED",
-          errorMessage: "Failed to decrypt Instagram access token",
+          errorMessage: INVALID_INSTAGRAM_TOKEN_ERROR,
         },
       });
       await recordAutomationFailure(
         automation.id,
-        new Error("Failed to decrypt Instagram access token")
+        new Error(INVALID_INSTAGRAM_TOKEN_ERROR)
       );
       continue;
     }
@@ -325,7 +337,9 @@ export async function processComment(
         data: {
           status: "SKIPPED_DEDUP",
           matchedKeyword: matchResult.matchedKeyword,
-          errorMessage: `Another campaign (${privateReplyUsedBy.automation?.name ?? "unknown"}) already sent the one private reply Instagram allows for this comment`,
+          errorMessage: privateReplyAlreadyUsedError(
+            privateReplyUsedBy.automation?.name
+          ),
         },
       });
       continue;
@@ -343,7 +357,7 @@ export async function processComment(
         data: {
           status: "SKIPPED_PLAN_LIMIT",
           matchedKeyword: matchResult.matchedKeyword,
-          errorMessage: `Monthly DM limit reached (${usage.limit})`,
+          errorMessage: monthlyDmLimitError(usage.limit),
         },
       });
       continue;
@@ -391,7 +405,7 @@ export async function processComment(
           data: {
             status: "SKIPPED_RATE_LIMIT",
             matchedKeyword: matchResult.matchedKeyword,
-            errorMessage: "Hourly Instagram DM rate limit reached",
+            errorMessage: hourlyDmLimitError,
           },
         });
         continue;
@@ -408,7 +422,7 @@ export async function processComment(
           data: {
             status: "PENDING",
             matchedKeyword: matchResult.matchedKeyword,
-            errorMessage: "Hourly rate limit hit; retry scheduled",
+            errorMessage: hourlyDmRetryMessage,
           },
         });
 
@@ -476,8 +490,7 @@ export async function processComment(
       } else if (sendFollowPrompt) {
         const promptText = renderMessageWithoutLink({
           message:
-            automation.followPromptMessage ||
-            "quick favor before i send your link. i don't make any money from this, it's free. if you want to support me, just don't unfollow after, and star the repo on github if it helps you. tap the button once you're following and i'll send it over",
+            automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE,
           commenterName,
         });
         await sendPrivateReplyWithButton(
@@ -485,7 +498,8 @@ export async function processComment(
           automation.instagramAccount.instagramId,
           commentId,
           promptText,
-          automation.followPromptButtonLabel || "i'm following",
+          automation.followPromptButtonLabel ||
+            DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
           `followcheck:${automation.id}`
         );
       } else if (automation.trackedLinks.length > 0) {
@@ -494,7 +508,7 @@ export async function processComment(
           renderMessageWithoutLink({
             message: automation.dmMessage,
             commenterName,
-          }) || "Here's your link:";
+          }) || DEFAULT_LINK_MESSAGE;
         const buttons = buildLinkButtons(
           automation.trackedLinks,
           automation.linkButtonLabel

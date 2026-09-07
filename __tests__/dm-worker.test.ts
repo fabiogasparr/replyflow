@@ -461,7 +461,8 @@ describe("DM Worker — Full Pipeline", () => {
       },
       data: {
         status: "FAILED",
-        errorMessage: "Automation is no longer active for this Instagram account",
+        errorMessage:
+          "A automação não está mais ativa para esta conta do Instagram",
       },
     });
   });
@@ -592,7 +593,8 @@ describe("DM Worker — Full Pipeline", () => {
       expect.objectContaining({
         create: expect.objectContaining({
           status: "FAILED",
-          errorMessage: "No Instagram access token available",
+          errorMessage:
+            "A conta do Instagram não possui uma credencial de acesso",
         }),
       })
     );
@@ -601,12 +603,12 @@ describe("DM Worker — Full Pipeline", () => {
     expect(mockRecordAutomationFailure).toHaveBeenCalledWith(
       "auto_789",
       expect.objectContaining({
-        message: "No Instagram access token available",
+        message: "A conta do Instagram não possui uma credencial de acesso",
       })
     );
   });
 
-  it("should use 'there' when commenter name is not available", async () => {
+  it("should use 'você' when commenter name is not available", async () => {
     const processor = getProcessor();
     const jobDataWithoutName = {
       instagramAccountId: mockJobData.instagramAccountId,
@@ -622,7 +624,7 @@ describe("DM Worker — Full Pipeline", () => {
       "decrypted_token",
       "ig_456",
       "comment_555",
-      "Hey there! Here is the link: https://example.com"
+      "Hey você! Here is the link: https://example.com"
     );
   });
 
@@ -1155,7 +1157,7 @@ describe("DM Worker — DM keyword trigger", () => {
       "ig_456",
       "commenter_999",
       expect.any(String),
-      "I'm following ✅",
+      "Já estou seguindo",
       "followcheck:auto_789"
     );
     expect(mockSendDirectMessage).not.toHaveBeenCalled();

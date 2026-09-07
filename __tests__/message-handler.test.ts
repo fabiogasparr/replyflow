@@ -154,7 +154,7 @@ describe("inbound message queue handler", () => {
       "business_1",
       "person_1",
       expect.any(String),
-      "I'm following ✅",
+      "Já estou seguindo",
       "followcheck:automation_1"
     );
     expect(mocks.sendRevealDirectMessage).not.toHaveBeenCalled();

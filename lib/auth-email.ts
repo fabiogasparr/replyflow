@@ -1,5 +1,13 @@
 import { createTransport } from "nodemailer";
 import type { NodemailerConfig } from "next-auth/providers/nodemailer";
+import {
+  hasUsableEmailSender,
+  hasUsableResendKey,
+  hasUsableSmtpServer,
+} from "@/lib/auth-readiness";
+
+const AUTH_CONFIGURATION_ERROR =
+  "O provedor de e-mail do ReplyFlow não está configurado";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -29,6 +37,13 @@ export function buildSignInEmail(url: string) {
 }
 
 export const sendSmtpVerification: NodemailerConfig["sendVerificationRequest"] = async ({ identifier, url, provider }) => {
+  if (
+    !hasUsableEmailSender(provider.from) ||
+    typeof provider.server !== "string" ||
+    !hasUsableSmtpServer(provider.server)
+  ) {
+    throw new Error(AUTH_CONFIGURATION_ERROR);
+  }
   const transport = createTransport(provider.server);
   const result = await transport.sendMail({
     to: identifier,
@@ -41,6 +56,12 @@ export const sendSmtpVerification: NodemailerConfig["sendVerificationRequest"] =
 };
 
 export const sendResendVerification: NodemailerConfig["sendVerificationRequest"] = async ({ identifier, url, provider }) => {
+  if (
+    !hasUsableEmailSender(provider.from) ||
+    !hasUsableResendKey(provider.apiKey)
+  ) {
+    throw new Error(AUTH_CONFIGURATION_ERROR);
+  }
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {

@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import BrandMark from "@/components/brand-mark";
 import { DemoNotice } from "@/components/demo-notice";
 import { EMAIL_PROVIDER_ID, signIn } from "@/lib/auth";
+import { getEmailAuthReadiness } from "@/lib/auth-readiness";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 
 export const metadata = {
@@ -25,9 +27,13 @@ export default async function LoginPage({
     ? `/campaigns/new?template=${selectedTemplate.slug}`
     : null;
   const callbackUrl = params.callbackUrl ?? templateCallbackUrl ?? "/dashboard";
+  const emailReadiness = getEmailAuthReadiness();
 
   async function sendMagicLink(formData: FormData) {
     "use server";
+    if (!getEmailAuthReadiness().ready) {
+      redirect("/login/error?error=Configuration");
+    }
     await signIn(EMAIL_PROVIDER_ID, {
       email: String(formData.get("email") ?? ""),
       redirectTo: callbackUrl,
@@ -105,6 +111,15 @@ export default async function LoginPage({
               </div>
             )}
 
+            {!checkEmail && !emailReadiness.ready && (
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border border-amber-500/30 bg-amber-50 p-4 text-sm leading-6 text-amber-950"
+              >
+                {emailReadiness.message}
+              </div>
+            )}
+
             {checkEmail ? (
               <div className="py-3">
                 <div className="grid h-12 w-12 place-items-center rounded-full bg-[#e3f2eb] text-success">
@@ -125,28 +140,35 @@ export default async function LoginPage({
               </div>
             ) : (
               <form action={sendMagicLink} className="space-y-5">
-                <div className="space-y-2">
-                  <label htmlFor="email" className="block text-sm font-semibold text-foreground">
-                    E-mail profissional
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    placeholder="voce@empresa.com.br"
-                    className="w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-[#9aa49f] transition-colors focus:border-accent focus:outline-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#112620] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#1c3a31]"
+                <fieldset
+                  disabled={!emailReadiness.ready}
+                  className="space-y-5 disabled:opacity-60"
                 >
-                  Receber link de acesso
-                  <span aria-hidden="true">→</span>
-                </button>
+                  <div className="space-y-2">
+                    <label htmlFor="email" className="block text-sm font-semibold text-foreground">
+                      E-mail profissional
+                    </label>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      placeholder="voce@empresa.com.br"
+                      className="w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-[#9aa49f] transition-colors focus:border-accent focus:outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#112620] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#1c3a31] disabled:cursor-not-allowed"
+                  >
+                    {emailReadiness.ready
+                      ? "Receber link de acesso"
+                      : "Envio indisponível"}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </fieldset>
               </form>
             )}
           </div>

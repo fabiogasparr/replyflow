@@ -1,15 +1,12 @@
 import { prisma } from "@/lib/db/client";
 import type { Prisma } from "@/app/generated/prisma/client";
 
-// Self-hosted build: usage is still counted per month so the dashboard can
-// report volume, but no cap is enforced. Meta's own rate limits apply instead.
-// Must stay within PostgreSQL int4 range, since dmsSentThisPeriod is an Int
-// column and this value is used in a `less-than` comparison against it. Two
-// billion DMs/month is effectively unlimited without overflowing the column.
-const MONTHLY_DM_LIMIT = 2_000_000_000;
-
 function getMonthStart(date = new Date()): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function getMonthEnd(date = new Date()): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 1);
 }
 
 async function resetUsageIfNeededTx(
@@ -52,66 +49,92 @@ export async function reserveWorkspaceDMSend(
     await resetUsageIfNeededTx(tx, workspaceId);
 
     const monthStart = getMonthStart();
+    const monthEnd = getMonthEnd();
     const workspace = await tx.workspace.findUnique({
       where: { id: workspaceId },
       select: {
         usagePeriodStart: true,
-        dmsSentThisPeriod: true,
+        subscription: {
+          select: {
+            plan: { select: { monthlyDmLimit: true } },
+          },
+        },
       },
     });
 
-    if (!workspace) {
+    const limit = workspace?.subscription?.plan.monthlyDmLimit;
+    if (!workspace || !limit || limit < 1) {
       return {
         allowed: false,
         reserved: false,
         remaining: 0,
-        limit: 0,
-        periodStart: null,
+        limit: limit ?? 0,
+        periodStart: workspace?.usagePeriodStart ?? null,
       };
     }
 
-    const limit = MONTHLY_DM_LIMIT;
-
-    if (workspace.dmsSentThisPeriod >= limit) {
-      return {
-        allowed: false,
-        reserved: false,
-        remaining: 0,
-        limit,
-        periodStart: workspace.usagePeriodStart,
-      };
-    }
-
-    const reserved = await tx.workspace.updateMany({
+    const usageRecord = await tx.usageRecord.upsert({
       where: {
-        id: workspaceId,
-        usagePeriodStart: { gte: monthStart },
-        dmsSentThisPeriod: { lt: limit },
+        workspaceId_metric_periodStart: {
+          workspaceId,
+          metric: "DM_SENT",
+          periodStart: monthStart,
+        },
       },
-      data: {
-        dmsSentThisPeriod: { increment: 1 },
+      create: {
+        workspaceId,
+        metric: "DM_SENT",
+        periodStart: monthStart,
+        periodEnd: monthEnd,
+        quantity: 0,
       },
+      update: { periodEnd: monthEnd },
+      select: { id: true },
+    });
+
+    const reserved = await tx.usageRecord.updateMany({
+      where: {
+        id: usageRecord.id,
+        quantity: { lt: limit },
+      },
+      data: { quantity: { increment: 1 } },
     });
 
     if (reserved.count === 0) {
-      const current = await tx.workspace.findUnique({
-        where: { id: workspaceId },
-        select: { dmsSentThisPeriod: true, usagePeriodStart: true },
+      const current = await tx.usageRecord.findUnique({
+        where: { id: usageRecord.id },
+        select: { quantity: true },
       });
 
       return {
         allowed: false,
         reserved: false,
-        remaining: Math.max(0, limit - (current?.dmsSentThisPeriod ?? limit)),
+        remaining: Math.max(0, limit - (current?.quantity ?? limit)),
         limit,
-        periodStart: current?.usagePeriodStart ?? workspace.usagePeriodStart,
+        periodStart: workspace.usagePeriodStart,
       };
     }
+
+    const mirrored = await tx.workspace.updateMany({
+      where: {
+        id: workspaceId,
+        usagePeriodStart: { gte: monthStart },
+      },
+      data: { dmsSentThisPeriod: { increment: 1 } },
+    });
+    if (mirrored.count !== 1) {
+      throw new Error("Não foi possível espelhar a reserva mensal do workspace");
+    }
+
+    const current = await tx.usageRecord.findUnique({
+      where: { id: usageRecord.id },
+      select: { quantity: true },
+    });
 
     return {
       allowed: true,
       reserved: true,
-      remaining: Math.max(0, limit - workspace.dmsSentThisPeriod - 1),
+      remaining: Math.max(0, limit - (current?.quantity ?? limit)),
       limit,
       periodStart: workspace.usagePeriodStart,
     };
@@ -123,27 +146,50 @@ export async function canSendDMForWorkspace(workspaceId: string): Promise<{
   remaining: number;
   limit: number;
 }> {
-  await resetUsageIfNeeded(workspaceId);
+  return prisma.$transaction(async (tx) => {
+    await resetUsageIfNeededTx(tx, workspaceId);
 
-  const workspace = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: {
-      dmsSentThisPeriod: true,
-    },
+    const monthStart = getMonthStart();
+    const monthEnd = getMonthEnd();
+    const workspace = await tx.workspace.findUnique({
+      where: { id: workspaceId },
+      select: {
+        subscription: {
+          select: { plan: { select: { monthlyDmLimit: true } } },
+        },
+      },
+    });
+    const limit = workspace?.subscription?.plan.monthlyDmLimit;
+    if (!workspace || !limit || limit < 1) {
+      return { allowed: false, remaining: 0, limit: limit ?? 0 };
+    }
+
+    const usage = await tx.usageRecord.upsert({
+      where: {
+        workspaceId_metric_periodStart: {
+          workspaceId,
+          metric: "DM_SENT",
+          periodStart: monthStart,
+        },
+      },
+      create: {
+        workspaceId,
+        metric: "DM_SENT",
+        periodStart: monthStart,
+        periodEnd: monthEnd,
+        quantity: 0,
+      },
+      update: { periodEnd: monthEnd },
+      select: { quantity: true },
+    });
+    const remaining = Math.max(0, limit - usage.quantity);
+
+    return {
+      allowed: usage.quantity < limit,
+      remaining,
+      limit,
+    };
   });
-
-  if (!workspace) {
-    return { allowed: false, remaining: 0, limit: 0 };
-  }
-
-  const limit = MONTHLY_DM_LIMIT;
-  const remaining = Math.max(0, limit - workspace.dmsSentThisPeriod);
-
-  return {
-    allowed: workspace.dmsSentThisPeriod < limit,
-    remaining,
-    limit,
-  };
 }
 
 export async function releaseWorkspaceDMReservation(
@@ -154,13 +200,29 @@ export async function releaseWorkspaceDMReservation(
     return { count: 0 };
   }
 
-  return prisma.workspace.updateMany({
-    where: {
-      id: workspaceId,
-      usagePeriodStart: periodStart,
-      dmsSentThisPeriod: { gt: 0 },
-    },
-    data: { dmsSentThisPeriod: { decrement: 1 } },
+  return prisma.$transaction(async (tx) => {
+    const released = await tx.usageRecord.updateMany({
+      where: {
+        workspaceId,
+        metric: "DM_SENT",
+        periodStart,
+        quantity: { gt: 0 },
+      },
+      data: { quantity: { decrement: 1 } },
+    });
+
+    if (released.count === 1) {
+      await tx.workspace.updateMany({
+        where: {
+          id: workspaceId,
+          usagePeriodStart: periodStart,
+          dmsSentThisPeriod: { gt: 0 },
+        },
+        data: { dmsSentThisPeriod: { decrement: 1 } },
+      });
+    }
+
+    return released;
   });
 }
 

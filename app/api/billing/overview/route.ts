@@ -19,28 +19,40 @@ export async function GET() {
     );
   }
 
-  const subscription = await prisma.subscription.findUnique({
-    where: { workspaceId: context.workspaceId },
-    select: {
-      provider: true,
-      status: true,
-      currentPeriodStart: true,
-      currentPeriodEnd: true,
-      trialEndsAt: true,
-      cancelAtPeriodEnd: true,
-      plan: {
-        select: {
-          code: true,
-          name: true,
-          currency: true,
-          monthlyPriceCents: true,
-          monthlyDmLimit: true,
-          instagramAccounts: true,
-          members: true,
+  const [subscription, usageRecord] = await Promise.all([
+    prisma.subscription.findUnique({
+      where: { workspaceId: context.workspaceId },
+      select: {
+        provider: true,
+        status: true,
+        currentPeriodStart: true,
+        currentPeriodEnd: true,
+        trialEndsAt: true,
+        cancelAtPeriodEnd: true,
+        plan: {
+          select: {
+            code: true,
+            name: true,
+            currency: true,
+            monthlyPriceCents: true,
+            monthlyDmLimit: true,
+            instagramAccounts: true,
+            members: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.usageRecord.findUnique({
+      where: {
+        workspaceId_metric_periodStart: {
+          workspaceId: context.workspaceId,
+          metric: "DM_SENT",
+          periodStart: context.workspace.usagePeriodStart,
+        },
+      },
+      select: { quantity: true },
+    }),
+  ]);
 
   if (!subscription) {
     return NextResponse.json(
@@ -52,7 +64,9 @@ export async function GET() {
     );
   }
 
-  const used = context.workspace.dmsSentThisPeriod;
+  // The legacy workspace counter remains a deployment-safe fallback while
+  // UsageRecord is the authoritative meter for current worker reservations.
+  const used = usageRecord?.quantity ?? context.workspace.dmsSentThisPeriod;
   const limit = subscription.plan.monthlyDmLimit;
 
   return NextResponse.json({

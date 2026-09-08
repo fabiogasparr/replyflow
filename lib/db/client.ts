@@ -5,6 +5,15 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
+function configuredSchema() {
+  const schema = process.env.REPLYFLOW_DATABASE_SCHEMA;
+  if (!schema) return undefined;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
+    throw new Error("REPLYFLOW_DATABASE_SCHEMA must be a PostgreSQL identifier");
+  }
+  return schema;
+}
+
 function createPrismaClient() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -12,7 +21,7 @@ function createPrismaClient() {
   }
 
   return new PrismaClient({
-    adapter: new PrismaPg(databaseUrl),
+    adapter: new PrismaPg(databaseUrl, { schema: configuredSchema() }),
   });
 }
 

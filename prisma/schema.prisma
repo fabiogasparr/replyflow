@@ -10,14 +10,15 @@ datasource db {
 }
 
 model User {
-  id                String    @id @default(cuid())
+  id                String       @id @default(cuid())
   name              String?
-  email             String?   @unique
+  email             String?      @unique
   emailVerified     DateTime?
   image             String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
   activeWorkspaceId String?
+  platformRole      PlatformRole @default(USER)
 
   accounts         Account[]
   sessions         Session[]
@@ -28,6 +29,7 @@ model User {
   auditEvents      AuditEvent[]          @relation("AuditActor")
 
   @@index([activeWorkspaceId])
+  @@index([platformRole])
 }
 
 model Account {
@@ -561,6 +563,11 @@ enum WorkspaceRole {
   OWNER
   ADMIN
   MEMBER
+}
+
+enum PlatformRole {
+  USER
+  ADMIN
 }
 
 enum WorkspacePlan {

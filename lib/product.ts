@@ -14,7 +14,8 @@ export type DashboardNavKey =
   | "campaigns"
   | "logs"
   | "settings"
-  | "diagnostics";
+  | "diagnostics"
+  | "platform";
 
 export const DASHBOARD_NAV_ITEMS: ReadonlyArray<{
   key: DashboardNavKey;
@@ -31,7 +32,18 @@ export const DASHBOARD_NAV_ITEMS: ReadonlyArray<{
   { key: "diagnostics", label: "Diagnóstico", href: "/diagnostics" },
 ] as const;
 
+export const PLATFORM_ADMIN_NAV_ITEM = {
+  key: "platform",
+  label: "Administração",
+  href: "/admin",
+} as const satisfies {
+  key: DashboardNavKey;
+  label: string;
+  href: string;
+};
+
 const dashboardPageTitles: ReadonlyArray<[prefix: string, title: string]> = [
+  ["/admin", "Administração da plataforma"],
   ["/campaigns/new", "Nova automação"],
   ["/automations/new", "Nova automação"],
   ["/campaigns", "Automações"],

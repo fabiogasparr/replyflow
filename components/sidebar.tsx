@@ -12,6 +12,7 @@ import { useState } from "react";
 import BrandMark from "@/components/brand-mark";
 import {
   DASHBOARD_NAV_ITEMS,
+  PLATFORM_ADMIN_NAV_ITEM,
   type DashboardNavKey,
 } from "@/lib/product";
 import type { UserWorkspaceOption } from "@/lib/workspace";
@@ -25,6 +26,7 @@ const navIcons: Record<DashboardNavKey, React.ReactNode> = {
   logs: <path d="M6 4h12v16H6V4Zm4 4h4m-4 4h5m-5 4h3" />,
   settings: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-5v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" />,
   diagnostics: <path d="M4 17h3l2-9 3 12 3-8 2 5h3M4 4h16v16H4V4Z" />,
+  platform: <path d="M4 20h16M6 20V8l6-4 6 4v12M9 11h2v2H9v-2Zm4 0h2v2h-2v-2Zm-4 5h2v2H9v-2Zm4 0h2v2h-2v-2Z" />,
 };
 
 interface SidebarProps {
@@ -33,6 +35,7 @@ interface SidebarProps {
   workspaceName: string;
   activeWorkspaceId: string;
   workspaces: UserWorkspaceOption[];
+  isPlatformAdmin: boolean;
 }
 
 export default function Sidebar({
@@ -41,6 +44,7 @@ export default function Sidebar({
   workspaceName,
   activeWorkspaceId,
   workspaces,
+  isPlatformAdmin,
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -103,7 +107,10 @@ export default function Sidebar({
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto" aria-label="Navegação principal">
-          {DASHBOARD_NAV_ITEMS.map((item) => {
+          {[
+            ...DASHBOARD_NAV_ITEMS,
+            ...(isPlatformAdmin ? [PLATFORM_ADMIN_NAV_ITEM] : []),
+          ].map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
             return (

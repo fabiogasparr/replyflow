@@ -168,7 +168,8 @@ Objetivo: operar comercialmente com limites previsíveis.
 - [ ] Integrar provedor de cobrança com cartão e Pix.
 - [ ] Implementar trial, upgrade, downgrade e cancelamento (transições internas concluídas; operações do cliente e provedor pendentes).
 - [x] Aplicar limites de DMs atomicamente no worker.
-- [ ] Limitar DMs, contas do Instagram, membros e workspaces por plano.
+- [x] Limitar contas do Instagram e integrantes pelo plano persistido.
+- [ ] Definir e limitar a quantidade de workspaces por conta comercial.
 - [ ] Criar portal de cobrança e histórico de faturas.
 - [ ] Processar webhooks de pagamento com idempotência.
 - [ ] Definir tolerância e bloqueio por inadimplência.
@@ -183,6 +184,7 @@ Progresso validado em 8 de setembro de 2026:
 - O processador interno serializa eventos por assinatura, ignora atualizações atrasadas e sincroniza assinatura e plano do workspace atomicamente.
 - Estados cancelado e incompleto retornam ao Gratuito; trial, ativo e inadimplência temporária mantêm o plano até a política comercial definitiva.
 - O worker reserva uso no registro mensal com o limite persistido no plano; concorrência e compensação foram validadas em PostgreSQL real.
+- Conexões do Instagram, convites e dashboard usam o mesmo catálogo persistido; downgrades não removem recursos automaticamente.
 - Preços pagos continuam pendentes de decisão comercial; esta etapa não cria checkout nem movimenta dinheiro.
 
 ## Marco 6 — Relatórios e administração

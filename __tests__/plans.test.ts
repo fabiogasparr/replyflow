@@ -1,33 +1,43 @@
 import { describe, expect, it } from "vitest";
 import {
   assertWorkspacePlanCapacity,
-  getWorkspacePlanDetails,
+  workspacePlanDetails,
+  WorkspaceBillingSetupError,
   WorkspacePlanLimitError,
 } from "@/lib/billing/plans";
 
 describe("workspace plan limits", () => {
-  it("defines progressively larger account and member allowances", () => {
-    expect(getWorkspacePlanDetails("FREE").limits).toEqual({
-      instagramAccounts: 1,
-      members: 2,
-    });
-    expect(getWorkspacePlanDetails("PRO").limits).toEqual({
-      instagramAccounts: 3,
-      members: 10,
-    });
-    expect(getWorkspacePlanDetails("AGENCY").limits).toEqual({
-      instagramAccounts: 10,
-      members: 50,
+  it("maps labels and limits only from the persisted plan", () => {
+    expect(
+      workspacePlanDetails({
+        code: "PRO",
+        name: "Profissional",
+        instagramAccounts: 7,
+        members: 12,
+      })
+    ).toEqual({
+      code: "PRO",
+      label: "Profissional",
+      limits: { instagramAccounts: 7, members: 12 },
     });
   });
 
   it("rejects capacity at the boundary with a structured error", () => {
     expect(() =>
-      assertWorkspacePlanCapacity("FREE", "instagramAccounts", 1)
+      assertWorkspacePlanCapacity("instagramAccounts", 1, 1)
     ).toThrowError(WorkspacePlanLimitError);
 
-    expect(
-      assertWorkspacePlanCapacity("PRO", "members", 4)
-    ).toEqual({ used: 4, limit: 10, remaining: 6 });
+    expect(assertWorkspacePlanCapacity("members", 4, 10)).toEqual({
+      used: 4,
+      limit: 10,
+      remaining: 6,
+    });
+  });
+
+  it("distinguishes an unavailable subscription from an exhausted plan", () => {
+    const error = new WorkspaceBillingSetupError();
+
+    expect(error.code).toBe("BILLING_SETUP_INCOMPLETE");
+    expect(error).not.toBeInstanceOf(WorkspacePlanLimitError);
   });
 });

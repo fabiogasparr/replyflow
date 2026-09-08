@@ -26,7 +26,9 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPrisma.workspace.findUnique.mockResolvedValue({ plan: "PRO" });
+  mockPrisma.workspace.findUnique.mockResolvedValue({
+    subscription: { plan: { instagramAccounts: 3 } },
+  });
   mockPrisma.instagramAccount.count.mockResolvedValue(0);
 });
 
@@ -73,7 +75,9 @@ describe("agency workspace helpers", () => {
 
   it("blocks a new account when the workspace reached its plan limit", async () => {
     mockPrisma.instagramAccount.findUnique.mockResolvedValue(null);
-    mockPrisma.workspace.findUnique.mockResolvedValue({ plan: "FREE" });
+    mockPrisma.workspace.findUnique.mockResolvedValue({
+      subscription: { plan: { instagramAccounts: 1 } },
+    });
     mockPrisma.instagramAccount.count.mockResolvedValue(1);
 
     await expect(
@@ -85,6 +89,21 @@ describe("agency workspace helpers", () => {
       allowed: false,
       reason: "plan_limit",
       limit: 1,
+    });
+  });
+
+  it("fails closed while the workspace subscription is unavailable", async () => {
+    mockPrisma.instagramAccount.findUnique.mockResolvedValue(null);
+    mockPrisma.workspace.findUnique.mockResolvedValue({ subscription: null });
+
+    await expect(
+      canConnectInstagramAccount({
+        workspaceId: "workspace_123",
+        instagramId: "ig_new",
+      })
+    ).resolves.toEqual({
+      allowed: false,
+      reason: "billing_setup",
     });
   });
 

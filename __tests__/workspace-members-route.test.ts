@@ -23,7 +23,7 @@ const { getCurrentWorkspaceContext, mockPrisma } = vi.hoisted(() => ({
       updateMany: vi.fn(),
     },
     user: { findUnique: vi.fn() },
-    workspace: { findUnique: vi.fn() },
+    subscription: { findUnique: vi.fn() },
     auditEvent: { create: vi.fn() },
     conversation: { updateMany: vi.fn() },
     $transaction: vi.fn(),
@@ -67,7 +67,9 @@ beforeEach(() => {
   mockPrisma.workspaceInvitation.findUnique.mockResolvedValue(null);
   mockPrisma.workspaceMember.count.mockResolvedValue(1);
   mockPrisma.workspaceInvitation.count.mockResolvedValue(0);
-  mockPrisma.workspace.findUnique.mockResolvedValue({ plan: "FREE" });
+  mockPrisma.subscription.findUnique.mockResolvedValue({
+    plan: { members: 2 },
+  });
   mockPrisma.auditEvent.create.mockResolvedValue({});
   mockPrisma.$transaction.mockImplementation(
     async (callback: (client: typeof mockPrisma) => unknown) =>
@@ -193,6 +195,23 @@ describe("workspace member authorization", () => {
       success: false,
       code: "PLAN_LIMIT_REACHED",
       data: { resource: "members", limit: 2 },
+    });
+    expect(mockPrisma.workspaceInvitation.upsert).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the workspace subscription is unavailable", async () => {
+    getCurrentWorkspaceContext.mockResolvedValue(context("OWNER"));
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.subscription.findUnique.mockResolvedValue(null);
+
+    const response = await POST(
+      request("POST", { email: "nova@example.com", role: "MEMBER" })
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      code: "BILLING_SETUP_INCOMPLETE",
     });
     expect(mockPrisma.workspaceInvitation.upsert).not.toHaveBeenCalled();
   });

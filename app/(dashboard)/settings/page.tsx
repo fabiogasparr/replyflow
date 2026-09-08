@@ -12,6 +12,7 @@ interface SettingsData {
     name: string;
     plan: "FREE" | "PRO" | "AGENCY";
     planLabel: string;
+    billingReady: boolean;
     limits: {
       instagramAccounts: number;
       members: number;
@@ -82,12 +83,6 @@ interface BillingOverviewData {
   };
   checkoutAvailable: boolean;
 }
-
-const planLabels: Record<SettingsData["workspace"]["plan"], string> = {
-  FREE: "Gratuito",
-  PRO: "Pro",
-  AGENCY: "Agência",
-};
 
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsData | null>(null);
@@ -250,9 +245,7 @@ export default function SettingsPage() {
     (membersData?.members.length ?? 0) +
     (membersData?.invitations.length ?? 0);
   const memberLimitReached = reservedSeats >= memberLimit;
-  const currentPlanLabel = data
-    ? planLabels[data.workspace.plan]
-    : "Gratuito";
+  const currentPlanLabel = data?.workspace.planLabel ?? "Plano indisponível";
   const monthlyPriceLabel =
     billingData?.plan.monthlyPriceCents == null
       ? "Preço em definição"

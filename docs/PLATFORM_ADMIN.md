@@ -64,4 +64,4 @@ O teste `npm run test:platform-admin-db` aplica todas as migrations anteriores e
 - Não remova a coluna durante uma reversão emergencial. Uma remoção futura deve primeiro confirmar que nenhum administrador global depende dela e ser entregue em outra migration.
 - Revogar todos os administradores pela alteração direta do banco não é suportado; o comando protege o último acesso operacional.
 
-O painel não substitui trilhas de auditoria nem ferramentas de suporte. Mutações globais, impersonação e reprocessamento permanecem fora deste módulo até receberem regras e auditoria próprias.
+O painel não substitui trilhas de auditoria nem ferramentas de suporte. A central de métricas e incidentes está detalhada em `docs/PLATFORM_OBSERVABILITY.md`. Mutações globais, impersonação e reprocessamento permanecem fora deste módulo até receberem regras e auditoria próprias.

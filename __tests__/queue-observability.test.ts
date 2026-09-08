@@ -14,6 +14,7 @@ vi.mock("@/lib/queue/client", () => ({
 
 import {
   getWorkspaceQueueSnapshot,
+  summarizePlatformQueueJobs,
   summarizeWorkspaceQueueJobs,
 } from "@/lib/ops/queue-observability";
 
@@ -77,6 +78,37 @@ describe("workspace queue observability", () => {
         now
       )
     ).toMatchObject({ status: "IDLE", oldestWaitingAgeMs: null });
+  });
+
+  it("marks retained failed jobs as degraded even without queue lag", () => {
+    expect(
+      summarizePlatformQueueJobs(
+        { waiting: [], active: [], delayed: [], failed: [{}] },
+        now
+      )
+    ).toMatchObject({
+      status: "DEGRADED",
+      counts: { waiting: 0, active: 0, delayed: 0, failed: 1 },
+    });
+  });
+
+  it("summarizes every platform job without returning job payloads", () => {
+    const snapshot = summarizePlatformQueueJobs(
+      {
+        waiting: [
+          { data: { instagramAccountId: "account_1" }, timestamp: now.getTime() - 20_000 },
+          { data: { instagramAccountId: "unknown" }, timestamp: now.getTime() - 10_000 },
+        ],
+        active: [],
+        delayed: [],
+        failed: [],
+      },
+      now
+    );
+
+    expect(snapshot.counts.waiting).toBe(2);
+    expect(snapshot).not.toHaveProperty("jobs");
+    expect(JSON.stringify(snapshot)).not.toContain("account_1");
   });
 
   it("loads only account identifiers from the requested workspace", async () => {

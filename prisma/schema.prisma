@@ -61,6 +61,7 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expires])
 }
 
 model VerificationToken {
@@ -190,6 +191,7 @@ model BillingEvent {
   @@unique([provider, providerEventId])
   @@index([workspaceId, createdAt])
   @@index([status, createdAt])
+  @@index([createdAt])
 }
 
 model WorkspaceMember {
@@ -252,6 +254,7 @@ model InstagramAccount {
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
+  @@index([tokenExpiresAt])
 }
 
 /// A person observed in automation logs, scoped to one workspace and account.
@@ -396,6 +399,7 @@ model Automation {
   @@index([instagramAccountId])
   @@index([postId])
   @@index([workspaceId, lastErrorAt])
+  @@index([lastErrorAt])
 }
 
 model DmLog {
@@ -447,6 +451,7 @@ model DmLog {
   @@index([automationId])
   @@index([instagramAccountId])
   @@index([status])
+  @@index([updatedAt])
 }
 
 // Every comment the system has seen, from either the webhook or the polling
@@ -521,6 +526,7 @@ model WebhookEvent {
 
   @@index([workspaceId])
   @@index([status])
+  @@index([createdAt])
 }
 
 model OperationalEvent {

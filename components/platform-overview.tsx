@@ -71,7 +71,13 @@ function SummaryCard({ label, value, detail }: { label: string; value: number; d
   );
 }
 
-export default function PlatformOverview({ adminName }: { adminName: string | null }) {
+export default function PlatformOverview({
+  adminName,
+  showHeader = true,
+}: {
+  adminName: string | null;
+  showHeader?: boolean;
+}) {
   const [data, setData] = useState<PlatformOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -163,7 +169,7 @@ export default function PlatformOverview({ adminName }: { adminName: string | nu
 
   return (
     <div className="space-y-6">
-      <div>
+      {showHeader && <div>
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a7310]">
           Operação ReplyFlow
         </p>
@@ -171,7 +177,7 @@ export default function PlatformOverview({ adminName }: { adminName: string | nu
         <p className="mt-1 text-sm text-muted">
           Visão global somente leitura{adminName ? ` para ${adminName}` : ""}. Nenhuma ação altera clientes ou planos.
         </p>
-      </div>
+      </div>}
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">

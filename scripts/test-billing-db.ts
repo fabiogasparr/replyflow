@@ -16,7 +16,8 @@ config({
   quiet: true,
 });
 
-const targetMigration = "20260907180000_add_billing_foundation";
+const foundationMigration = "20260907180000_add_billing_foundation";
+const targetMigration = "20260908103000_add_subscription_event_cursor";
 const schema = `replyflow_billing_test_${randomBytes(8).toString("hex")}`;
 const safeSchema = /^replyflow_billing_test_[a-f0-9]{16}$/;
 
@@ -76,9 +77,14 @@ async function main() {
     const migrations = (await readdir(path.join(projectRoot, "prisma/migrations")))
       .filter((name) => /^\d{14}_/.test(name))
       .sort();
+    const foundationIndex = migrations.indexOf(foundationMigration);
     const targetIndex = migrations.indexOf(targetMigration);
-    assert.ok(targetIndex > 0, "Migration de cobrança não encontrada.");
-    for (const name of migrations.slice(0, targetIndex)) {
+    assert.ok(foundationIndex > 0, "Migration de cobrança não encontrada.");
+    assert.ok(
+      targetIndex >= foundationIndex,
+      "Migration do cursor de eventos não encontrada."
+    );
+    for (const name of migrations.slice(0, foundationIndex)) {
       await client.query(await migrationSql(name));
     }
 
@@ -93,7 +99,9 @@ async function main() {
         ('workspace_2', 'Empresa B', 'owner_1', 'FREE', '2026-09-01', 7, CURRENT_TIMESTAMP);
     `);
 
-    await client.query(await migrationSql(targetMigration));
+    for (const name of migrations.slice(foundationIndex, targetIndex + 1)) {
+      await client.query(await migrationSql(name));
+    }
 
     const plans = (
       await client.query(
@@ -145,6 +153,25 @@ async function main() {
         status: "ACTIVE",
       },
     ]);
+
+    const eventCursor = (
+      await client.query(
+        `SELECT "lastProviderEventAt", "lastProviderEventId"
+         FROM "Subscription" WHERE "workspaceId" = 'workspace_1'`
+      )
+    ).rows[0];
+    assert.deepEqual(eventCursor, {
+      lastProviderEventAt: null,
+      lastProviderEventId: null,
+    });
+    const cursorIndex = (
+      await client.query(
+        `SELECT indexdef FROM pg_indexes
+         WHERE schemaname = current_schema()
+           AND indexname = 'Subscription_provider_lastProviderEventAt_idx'`
+      )
+    ).rows[0]?.indexdef;
+    assert.match(cursorIndex ?? "", /"?provider"?, "lastProviderEventAt"/);
 
     const usage = (
       await client.query(
@@ -208,7 +235,9 @@ async function main() {
 
     await client.query(`
       UPDATE "Subscription"
-      SET "provider" = 'STRIPE', "providerCustomerId" = 'customer_shared'
+      SET "provider" = 'STRIPE', "providerCustomerId" = 'customer_shared',
+          "lastProviderEventAt" = '2026-09-08T10:00:00Z',
+          "lastProviderEventId" = 'stripe_event_1'
       WHERE "workspaceId" = 'workspace_1';
       UPDATE "Subscription"
       SET "provider" = 'MERCADO_PAGO', "providerCustomerId" = 'customer_shared'
@@ -221,6 +250,20 @@ async function main() {
        WHERE "workspaceId" = 'workspace_2'`,
       "23505"
     );
+
+    const persistedCursor = (
+      await client.query(
+        `SELECT to_char(
+           "lastProviderEventAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS'
+         ) AS "lastProviderEventAt", "lastProviderEventId"
+         FROM "Subscription" WHERE "workspaceId" = 'workspace_1'`
+      )
+    ).rows[0];
+    assert.equal(
+      persistedCursor.lastProviderEventAt,
+      "2026-09-08T10:00:00.000"
+    );
+    assert.equal(persistedCursor.lastProviderEventId, "stripe_event_1");
 
     await client.query(`DELETE FROM "Workspace" WHERE "id" = 'workspace_1'`);
     const remaining = await client.query(
@@ -238,7 +281,7 @@ async function main() {
     });
 
     console.log(
-      `Cobrança: catálogo, backfill, idempotência, isolamento, validações e cascata aprovados após ${targetIndex + 1} migrations reais.`
+      `Cobrança: catálogo, backfill, cursor, idempotência, isolamento, validações e cascata aprovados após ${targetIndex + 1} migrations reais.`
     );
   } finally {
     try {

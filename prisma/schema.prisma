@@ -134,6 +134,8 @@ model Subscription {
   currentPeriodEnd       DateTime?
   cancelAtPeriodEnd      Boolean            @default(false)
   canceledAt             DateTime?
+  lastProviderEventAt    DateTime?
+  lastProviderEventId    String?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
@@ -146,6 +148,7 @@ model Subscription {
   @@unique([provider, providerSubscriptionId])
   @@index([planCode, status])
   @@index([provider, status])
+  @@index([provider, lastProviderEventAt])
 }
 
 model UsageRecord {

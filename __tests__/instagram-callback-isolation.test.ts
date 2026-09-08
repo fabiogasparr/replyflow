@@ -68,7 +68,7 @@ beforeEach(() => {
   mocks.subscribeInstagramAccountToWebhooks.mockResolvedValue({ success: true });
   mocks.transaction.workspaceMember.findUnique.mockResolvedValue({ role: "ADMIN" });
   mocks.transaction.workspace.findUnique.mockResolvedValue({
-    plan: "PRO",
+    subscription: { plan: { instagramAccounts: 3 } },
     _count: { instagramAccounts: 0 },
   });
   mocks.prisma.$transaction.mockImplementation(
@@ -146,7 +146,7 @@ describe("Instagram callback workspace isolation", () => {
   it("rechecks plan capacity inside the connection transaction", async () => {
     mocks.transaction.instagramAccount.findUnique.mockResolvedValue(null);
     mocks.transaction.workspace.findUnique.mockResolvedValue({
-      plan: "FREE",
+      subscription: { plan: { instagramAccounts: 1 } },
       _count: { instagramAccounts: 1 },
     });
 
@@ -154,6 +154,22 @@ describe("Instagram callback workspace isolation", () => {
 
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/settings?instagram=plan_limit"
+    );
+    expect(mocks.transaction.instagramAccount.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.operationalEvent.create).not.toHaveBeenCalled();
+  });
+
+  it("reports billing setup without persisting an operational failure", async () => {
+    mocks.transaction.instagramAccount.findUnique.mockResolvedValue(null);
+    mocks.transaction.workspace.findUnique.mockResolvedValue({
+      subscription: null,
+      _count: { instagramAccounts: 0 },
+    });
+
+    const response = await GET(callbackRequest());
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/settings?instagram=billing_setup"
     );
     expect(mocks.transaction.instagramAccount.create).not.toHaveBeenCalled();
     expect(mocks.prisma.operationalEvent.create).not.toHaveBeenCalled();

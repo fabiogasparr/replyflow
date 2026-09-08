@@ -41,6 +41,12 @@ const MESSAGES: Record<string, { tone: Tone; title: string; detail: string }> = 
     detail:
       "Este espaço já usa todas as contas do Instagram incluídas no plano atual.",
   },
+  billing_setup: {
+    tone: "warning",
+    title: "Plano ainda em preparação",
+    detail:
+      "A assinatura deste espaço ainda não está pronta. Aguarde um instante e tente conectar novamente.",
+  },
 };
 
 export function InstagramConnectNotice() {

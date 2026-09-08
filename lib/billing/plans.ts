@@ -1,29 +1,25 @@
-import type { WorkspacePlan } from "@/app/generated/prisma/client";
-
 export type WorkspacePlanLimits = {
   instagramAccounts: number;
   members: number;
 };
 
-export const WORKSPACE_PLANS: Record<
-  WorkspacePlan,
-  { label: string; limits: WorkspacePlanLimits }
-> = {
-  FREE: {
-    label: "Free",
-    limits: { instagramAccounts: 1, members: 2 },
-  },
-  PRO: {
-    label: "Pro",
-    limits: { instagramAccounts: 3, members: 10 },
-  },
-  AGENCY: {
-    label: "Agência",
-    limits: { instagramAccounts: 10, members: 50 },
-  },
-};
-
 export type WorkspaceLimitResource = keyof WorkspacePlanLimits;
+
+export function workspacePlanDetails(plan: {
+  code: "FREE" | "PRO" | "AGENCY";
+  name: string;
+  instagramAccounts: number;
+  members: number;
+}) {
+  return {
+    code: plan.code,
+    label: plan.name,
+    limits: {
+      instagramAccounts: plan.instagramAccounts,
+      members: plan.members,
+    },
+  };
+}
 
 export class WorkspacePlanLimitError extends Error {
   readonly code = "PLAN_LIMIT_REACHED";
@@ -37,16 +33,20 @@ export class WorkspacePlanLimitError extends Error {
   }
 }
 
-export function getWorkspacePlanDetails(plan: WorkspacePlan) {
-  return WORKSPACE_PLANS[plan];
+export class WorkspaceBillingSetupError extends Error {
+  readonly code = "BILLING_SETUP_INCOMPLETE";
+
+  constructor() {
+    super("Workspace subscription is not ready");
+    this.name = "WorkspaceBillingSetupError";
+  }
 }
 
 export function assertWorkspacePlanCapacity(
-  plan: WorkspacePlan,
   resource: WorkspaceLimitResource,
-  used: number
+  used: number,
+  limit: number
 ) {
-  const limit = WORKSPACE_PLANS[plan].limits[resource];
   if (used >= limit) {
     throw new WorkspacePlanLimitError(resource, limit);
   }

@@ -13,6 +13,7 @@ import { canManageInstagram } from "@/lib/workspace-access";
 import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 import {
   assertWorkspacePlanCapacity,
+  WorkspaceBillingSetupError,
   WorkspacePlanLimitError,
 } from "@/lib/billing/plans";
 import { clearAutomationCredentialFailures } from "@/lib/automations/operational-state";
@@ -70,6 +71,8 @@ export async function GET(request: NextRequest) {
       const status =
         connection.reason === "plan_limit"
           ? "plan_limit"
+          : connection.reason === "billing_setup"
+            ? "billing_setup"
           : connection.reason === "already_connected"
             ? "already_connected"
             : "failed";
@@ -125,17 +128,24 @@ export async function GET(request: NextRequest) {
         const workspace = await transaction.workspace.findUnique({
           where: { id: state.workspaceId },
           select: {
-            plan: true,
+            subscription: {
+              select: {
+                plan: { select: { instagramAccounts: true } },
+              },
+            },
             _count: { select: { instagramAccounts: true } },
           },
         });
         if (!workspace) {
           throw new Error("Workspace not found during Instagram connection");
         }
+        if (!workspace.subscription) {
+          throw new WorkspaceBillingSetupError();
+        }
         assertWorkspacePlanCapacity(
-          workspace.plan,
           "instagramAccounts",
-          workspace._count.instagramAccounts
+          workspace._count.instagramAccounts,
+          workspace.subscription.plan.instagramAccounts
         );
       }
 
@@ -186,6 +196,9 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     if (err instanceof WorkspacePlanLimitError) {
       return NextResponse.redirect(`${baseUrl}/settings?instagram=plan_limit`);
+    }
+    if (err instanceof WorkspaceBillingSetupError) {
+      return NextResponse.redirect(`${baseUrl}/settings?instagram=billing_setup`);
     }
 
     const message = err instanceof Error ? err.message : "Unknown error";

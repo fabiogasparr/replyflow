@@ -17,6 +17,7 @@ import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
 import type { Prisma } from "@/app/generated/prisma/client";
 import {
   assertWorkspacePlanCapacity,
+  WorkspaceBillingSetupError,
   WorkspacePlanLimitError,
 } from "@/lib/billing/plans";
 
@@ -39,10 +40,10 @@ async function assertMemberCapacity(
   transaction: Prisma.TransactionClient,
   workspaceId: string
 ) {
-  const [workspace, memberCount, pendingInvitationCount] = await Promise.all([
-    transaction.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { plan: true },
+  const [subscription, memberCount, pendingInvitationCount] = await Promise.all([
+    transaction.subscription.findUnique({
+      where: { workspaceId },
+      select: { plan: { select: { members: true } } },
     }),
     transaction.workspaceMember.count({ where: { workspaceId } }),
     transaction.workspaceInvitation.count({
@@ -54,11 +55,11 @@ async function assertMemberCapacity(
     }),
   ]);
 
-  if (!workspace) throw new Error("Workspace not found while checking plan");
+  if (!subscription) throw new WorkspaceBillingSetupError();
   assertWorkspacePlanCapacity(
-    workspace.plan,
     "members",
-    memberCount + pendingInvitationCount
+    memberCount + pendingInvitationCount,
+    subscription.plan.members
   );
 }
 
@@ -69,6 +70,17 @@ function memberPlanLimitResponse(error: WorkspacePlanLimitError) {
       code: error.code,
       error: `Seu plano permite até ${error.limit} integrantes e convites ativos.`,
       data: { resource: error.resource, limit: error.limit },
+    },
+    { status: 409 }
+  );
+}
+
+function memberBillingSetupResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      code: "BILLING_SETUP_INCOMPLETE",
+      error: "O plano deste espaço ainda está sendo preparado. Tente novamente.",
     },
     { status: 409 }
   );
@@ -280,6 +292,9 @@ export async function POST(request: NextRequest) {
       if (error instanceof WorkspacePlanLimitError) {
         return memberPlanLimitResponse(error);
       }
+      if (error instanceof WorkspaceBillingSetupError) {
+        return memberBillingSetupResponse();
+      }
       throw error;
     }
   } else {
@@ -327,6 +342,9 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       if (error instanceof WorkspacePlanLimitError) {
         return memberPlanLimitResponse(error);
+      }
+      if (error instanceof WorkspaceBillingSetupError) {
+        return memberBillingSetupResponse();
       }
       throw error;
     }

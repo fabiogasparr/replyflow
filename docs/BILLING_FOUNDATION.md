@@ -46,6 +46,14 @@ A reserva, a criação do período e o contador de compatibilidade do workspace 
 
 Os três planos continuam configurados com 2 bilhões de DMs mensais, portanto esta entrega ativa a infraestrutura de aplicação do limite sem reduzir a capacidade comercial existente. Alterar esse número passa a ter efeito operacional e deve ser tratado como decisão comercial, com comunicação e monitoramento.
 
+## Direitos de contas e equipe
+
+Os limites de contas do Instagram e integrantes também são lidos exclusivamente do `Plan` associado à assinatura. A validação é repetida dentro das transações de conexão e convite, evitando que duas operações concorrentes consumam a mesma última vaga.
+
+Depois de um downgrade, contas e integrantes acima do novo limite não são removidos automaticamente. O workspace continua acessível, mas novas conexões e novos convites ficam bloqueados até o uso voltar à capacidade contratada. Se a assinatura estiver temporariamente ausente durante uma implantação, essas operações falham fechadas com a mensagem “Plano ainda em preparação”.
+
+O dashboard e a tela de configurações exibem nome e capacidades do mesmo registro persistido. Assim, uma alteração administrativa no catálogo não depende de recompilar constantes da aplicação.
+
 ## Isolamento e idempotência
 
 - toda assinatura e todo registro de uso pertencem a exatamente um workspace;
@@ -67,4 +75,4 @@ npm run test:billing-db
 npm run test:billing-usage-db
 ```
 
-Para rollback, publique primeiro a versão anterior da aplicação; as tabelas e as colunas de cursor podem permanecer sem impacto. Removê-las exige backup e uma migration reversa explícita. Não reverta manualmente em produção enquanto eventos de cobrança estiverem sendo gravados.
+Para rollback, publique primeiro a versão anterior da aplicação; as tabelas e as colunas de cursor podem permanecer sem impacto. A versão anterior volta a usar as capacidades estáticas originais. Removê-las exige backup e uma migration reversa explícita. Não reverta manualmente em produção enquanto eventos de cobrança estiverem sendo gravados.

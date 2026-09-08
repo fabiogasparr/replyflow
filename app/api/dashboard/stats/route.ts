@@ -6,7 +6,7 @@ import {
   normalizeTopKeywords,
   summarizeDmStatuses,
 } from "@/lib/tracking/analytics";
-import { getWorkspacePlanDetails } from "@/lib/billing/plans";
+import { workspacePlanDetails } from "@/lib/billing/plans";
 
 export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
@@ -58,6 +58,18 @@ export async function GET(request: NextRequest) {
         name: true,
         plan: true,
         dmsSentThisPeriod: true,
+        subscription: {
+          select: {
+            plan: {
+              select: {
+                code: true,
+                name: true,
+                instagramAccounts: true,
+                members: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.instagramAccount.findFirst({
@@ -190,6 +202,9 @@ export async function GET(request: NextRequest) {
     user?.name?.trim().split(/\s+/)[0] ||
     user?.email?.split("@")[0] ||
     null;
+  const subscribedPlan = workspace?.subscription
+    ? workspacePlanDetails(workspace.subscription.plan)
+    : null;
 
   return NextResponse.json({
     success: true,
@@ -198,9 +213,15 @@ export async function GET(request: NextRequest) {
       contactsCount: contactRows.length,
       workspace: workspace
         ? {
-            ...workspace,
-            planLabel: getWorkspacePlanDetails(workspace.plan).label,
-            limits: getWorkspacePlanDetails(workspace.plan).limits,
+            name: workspace.name,
+            plan: subscribedPlan?.code ?? workspace.plan,
+            dmsSentThisPeriod: workspace.dmsSentThisPeriod,
+            planLabel: subscribedPlan?.label ?? "Plano indisponível",
+            billingReady: Boolean(subscribedPlan),
+            limits: subscribedPlan?.limits ?? {
+              instagramAccounts: 0,
+              members: 0,
+            },
           }
         : null,
       instagramAccount,

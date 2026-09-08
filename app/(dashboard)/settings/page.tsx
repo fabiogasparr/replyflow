@@ -5,6 +5,7 @@ import type { AccountOption } from "@/components/account-select";
 import { InstagramConnectNotice } from "@/components/instagram-connect-notice";
 import WorkspaceManager from "@/components/workspace-manager";
 import WorkspaceAuditLog from "@/components/workspace-audit-log";
+import BillingActivity from "@/components/billing-activity";
 import { formatNumber } from "@/lib/i18n";
 
 interface SettingsData {
@@ -527,6 +528,8 @@ export default function SettingsPage() {
       </section>
 
       <WorkspaceAuditLog />
+
+      {membersData?.currentUserRole === "OWNER" && <BillingActivity />}
 
       <section className="panel rounded p-4 sm:p-6">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">

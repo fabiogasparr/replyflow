@@ -23,6 +23,21 @@ Nenhum checkout, link de pagamento, webhook externo ou movimentação financeira
 
 Novos workspaces criam assinatura Gratuita e registro mensal de uso na mesma transação que cria o proprietário e a auditoria. Assim, não existe uma janela em que o espaço esteja ativo sem sua estrutura de cobrança.
 
+## Ciclo interno de assinatura
+
+O serviço interno `processSubscriptionEvent` prepara a aplicação para receber eventos de Stripe ou Mercado Pago, mas ainda não existe rota pública de webhook nem credencial de cobrança configurada. Cada adaptador futuro deverá verificar a assinatura criptográfica do provedor antes de chamar esse serviço.
+
+- o identificador externo torna cada evento idempotente;
+- a assinatura é bloqueada no PostgreSQL durante a transição, evitando que eventos concorrentes sobrescrevam uma atualização mais nova;
+- eventos anteriores ao último evento aplicado ficam registrados como ignorados;
+- assinatura, plano efetivo do workspace e auditoria são atualizados na mesma transação;
+- `TRIALING`, `ACTIVE` e `PAST_DUE` mantêm o plano contratado; `PAST_DUE` representa a tolerância operacional, não uma renovação confirmada;
+- `CANCELED` e `INCOMPLETE` removem o direito pago e retornam o workspace ao plano Gratuito;
+- períodos invertidos, planos indisponíveis e troca inesperada de provedor falham sem mudar o acesso;
+- metadados são limitados e chaves que indiquem token, segredo, cookie, senha ou dados de cartão são descartadas.
+
+Preços, duração da tolerância, política de tentativas e ações iniciadas pelo cliente continuam pendentes de decisão comercial. O processador não cria cobrança, checkout, reembolso ou assinatura no provedor.
+
 ## Isolamento e idempotência
 
 - toda assinatura e todo registro de uso pertencem a exatamente um workspace;
@@ -35,7 +50,7 @@ Novos workspaces criam assinatura Gratuita e registro mensal de uso na mesma tra
 
 ## Implantação e rollback
 
-Antes de publicar código que leia as novas tabelas, execute `npm run db:migrate`. A migration é aditiva e faz backfill sem apagar ou alterar os contadores existentes.
+Antes de publicar código que leia as novas tabelas ou grave o cursor de eventos, execute `npm run db:migrate`. As migrations são aditivas e fazem backfill sem apagar ou alterar os contadores existentes.
 
 Valide em PostgreSQL local com:
 
@@ -43,4 +58,4 @@ Valide em PostgreSQL local com:
 npm run test:billing-db
 ```
 
-Para rollback da aplicação, publique o commit anterior; as tabelas novas podem permanecer sem impacto. Removê-las exige backup e uma migration reversa explícita. Não reverta manualmente em produção enquanto eventos de cobrança estiverem sendo gravados.
+Para rollback, publique primeiro a versão anterior da aplicação; as tabelas e as colunas de cursor podem permanecer sem impacto. Removê-las exige backup e uma migration reversa explícita. Não reverta manualmente em produção enquanto eventos de cobrança estiverem sendo gravados.

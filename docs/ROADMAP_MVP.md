@@ -166,7 +166,7 @@ Objetivo: operar comercialmente com limites previsíveis.
 - [ ] Definir planos, preços e métricas de uso.
 - [x] Criar modelos `Plan`, `Subscription`, `UsageRecord` e `BillingEvent`.
 - [ ] Integrar provedor de cobrança com cartão e Pix.
-- [ ] Implementar trial, upgrade, downgrade e cancelamento.
+- [ ] Implementar trial, upgrade, downgrade e cancelamento (transições internas concluídas; operações do cliente e provedor pendentes).
 - [ ] Aplicar limites atomicamente no worker.
 - [ ] Limitar DMs, contas do Instagram, membros e workspaces por plano.
 - [ ] Criar portal de cobrança e histórico de faturas.
@@ -180,6 +180,8 @@ Progresso validado em 8 de setembro de 2026:
 - Catálogo, assinatura atual, uso periódico e eventos idempotentes foram modelados sem ativar cobrança externa.
 - Workspaces existentes recebem assinatura manual e registro de uso por backfill, preservando o plano e o contador atuais.
 - A chave estrangeira composta entre evento, assinatura e workspace impede associação cruzada entre empresas no próprio PostgreSQL.
+- O processador interno serializa eventos por assinatura, ignora atualizações atrasadas e sincroniza assinatura e plano do workspace atomicamente.
+- Estados cancelado e incompleto retornam ao Gratuito; trial, ativo e inadimplência temporária mantêm o plano até a política comercial definitiva.
 - Preços pagos continuam pendentes de decisão comercial; esta etapa não cria checkout nem movimenta dinheiro.
 
 ## Marco 6 — Relatórios e administração

@@ -196,12 +196,21 @@ Objetivo: dar visibilidade ao cliente e à operação do SaaS.
 - [ ] Consolidar envios, falhas, cliques, CTR e conversão por campanha.
 - [ ] Criar filtros por conta, workspace e período.
 - [ ] Criar relatórios compartilháveis com marca do cliente.
-- [ ] Implementar painel global de clientes, planos e uso.
+- [x] Implementar painel global de clientes, planos e uso, inicialmente somente leitura.
 - [ ] Exibir contas com tokens vencidos e workers indisponíveis.
 - [ ] Criar ferramentas seguras de suporte e reprocessamento.
 - [ ] Adicionar alertas de fila, webhook, autenticação e cobrança.
 
 Critério de saída: clientes acompanham resultados e a equipe administra incidentes sem acessar diretamente o banco.
+
+Progresso validado em 8 de setembro de 2026:
+
+- O papel global `PlatformRole` foi separado dos papéis de workspace e adota `USER` como padrão para contas existentes e novas.
+- A concessão ou revogação de acesso exige um comando explícito, e-mail verificado e confirmação; o último administrador não pode ser removido pelo comando.
+- O painel global lista empresas, proprietários, assinaturas, consumo, recursos e alertas de token/webhook com busca, filtros e paginação.
+- Tanto a página quanto a API revalidam o papel persistido; usuários comuns não recebem o item de navegação e são bloqueados no servidor.
+- Tokens da Meta, mensagens, metadados financeiros e ferramentas de impersonação não fazem parte da resposta.
+- Migration, backfill, padrão seguro e índice foram validados após as 28 migrations anteriores em PostgreSQL descartável. Impacto e rollback estão em `docs/PLATFORM_ADMIN.md`.
 
 ## Marco 7 — Expansões posteriores ao MVP
 
@@ -218,8 +227,8 @@ Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos
 
 ## Próxima execução recomendada
 
-1. Adicionar cobrança recorrente e aplicação de limites de uso por plano.
-2. Criar o painel administrativo global de clientes, planos e uso.
+1. Adicionar cobrança recorrente com cartão e Pix e definir preços dos planos.
+2. Evoluir alertas globais de worker e fila sem permitir acesso a conteúdo dos clientes.
 3. Adicionar o teste end-to-end mínimo de acesso e criação de campanha.
 4. Concluir acessibilidade, responsividade e revisão jurídica das páginas públicas.
 5. Publicar cada módulo validado em uma branch própria, conforme autorização do responsável.

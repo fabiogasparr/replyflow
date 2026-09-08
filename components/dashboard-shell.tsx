@@ -12,6 +12,7 @@ interface DashboardShellProps {
   workspaces: UserWorkspaceOption[];
   instagramUsername: string | null;
   instagramAccountCount: number;
+  isPlatformAdmin: boolean;
 }
 
 export default function DashboardShell({
@@ -21,6 +22,7 @@ export default function DashboardShell({
   workspaces,
   instagramUsername,
   instagramAccountCount,
+  isPlatformAdmin,
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -34,6 +36,7 @@ export default function DashboardShell({
         workspaceName={workspaceName}
         activeWorkspaceId={activeWorkspaceId}
         workspaces={workspaces}
+        isPlatformAdmin={isPlatformAdmin}
       />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

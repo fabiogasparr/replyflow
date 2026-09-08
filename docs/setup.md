@@ -261,6 +261,16 @@ createdb openreply
 
 Then set `DATABASE_URL` to match your local user, for example `postgresql://YOUR_USER@localhost:5432/openreply`.
 
+### Administração global
+
+O acesso global do ReplyFlow é separado do papel de administrador de cada workspace. Depois de aplicar as migrations, promova somente uma conta existente e com e-mail verificado:
+
+```bash
+npm run admin:role -- grant admin@empresa.com --confirm
+```
+
+O painel ficará disponível em `/admin`. Para remover o acesso use `revoke` no lugar de `grant`; o comando não permite remover o último administrador. Nenhum usuário é promovido automaticamente. Veja os dados expostos, a ordem de implantação e o rollback em `docs/PLATFORM_ADMIN.md`.
+
 Run the two processes in separate terminals:
 
 ```bash

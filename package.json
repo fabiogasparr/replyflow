@@ -20,7 +20,9 @@
     "test:dm-retry-queue": "tsx scripts/test-dm-retry-queue.ts",
     "test:automation-state-db": "tsx scripts/test-automation-state-db.ts",
     "test:billing-db": "tsx scripts/test-billing-db.ts",
-    "test:billing-usage-db": "tsx scripts/test-billing-usage-db.ts"
+    "test:billing-usage-db": "tsx scripts/test-billing-usage-db.ts",
+    "test:platform-admin-db": "tsx scripts/test-platform-admin-db.ts",
+    "admin:role": "tsx scripts/set-platform-admin.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

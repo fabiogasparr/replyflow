@@ -15,13 +15,17 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const [accounts, workspaces] = await Promise.all([
+  const [accounts, workspaces, platformUser] = await Promise.all([
     prisma.instagramAccount.findMany({
       where: { workspaceId: context.workspaceId },
       orderBy: { connectedAt: "desc" },
       select: { username: true },
     }),
     listUserWorkspaces(context.userId),
+    prisma.user.findUnique({
+      where: { id: context.userId },
+      select: { platformRole: true },
+    }),
   ]);
 
   return (
@@ -32,6 +36,7 @@ export default async function DashboardLayout({
       workspaces={workspaces}
       instagramUsername={accounts[0]?.username ?? null}
       instagramAccountCount={accounts.length}
+      isPlatformAdmin={platformUser?.platformRole === "ADMIN"}
     >
       {children}
     </DashboardShell>

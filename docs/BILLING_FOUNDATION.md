@@ -17,6 +17,12 @@ O plano Gratuito recebe preço zero. Os preços de Pro e Agência permanecem nul
 
 Nenhum checkout, link de pagamento, webhook externo ou movimentação financeira foi habilitado. `MERCADO_PAGO` e `STRIPE` existem apenas como opções de modelagem para uma integração futura.
 
+## Visão no produto
+
+`GET /api/billing/overview` retorna somente a assinatura do workspace ativo e o contador mensal que continua sendo a fonte operacional. A tela de Configurações apresenta plano, estado, mensalidade e progresso de uso; quando o preço ainda não foi aprovado, informa isso explicitamente em vez de exibir um valor estimado.
+
+Novos workspaces criam assinatura Gratuita e registro mensal de uso na mesma transação que cria o proprietário e a auditoria. Assim, não existe uma janela em que o espaço esteja ativo sem sua estrutura de cobrança.
+
 ## Isolamento e idempotência
 
 - toda assinatura e todo registro de uso pertencem a exatamente um workspace;

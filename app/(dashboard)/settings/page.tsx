@@ -5,6 +5,7 @@ import type { AccountOption } from "@/components/account-select";
 import { InstagramConnectNotice } from "@/components/instagram-connect-notice";
 import WorkspaceManager from "@/components/workspace-manager";
 import WorkspaceAuditLog from "@/components/workspace-audit-log";
+import { formatNumber } from "@/lib/i18n";
 
 interface SettingsData {
   workspace: {
@@ -54,6 +55,34 @@ interface WorkspaceMembersData {
   }>;
 }
 
+interface BillingOverviewData {
+  plan: {
+    code: "FREE" | "PRO" | "AGENCY";
+    name: string;
+    currency: string;
+    monthlyPriceCents: number | null;
+    monthlyDmLimit: number;
+    instagramAccounts: number;
+    members: number;
+  };
+  subscription: {
+    provider: "MANUAL" | "MERCADO_PAGO" | "STRIPE";
+    status: string;
+    statusLabel: string;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+    trialEndsAt: string | null;
+    cancelAtPeriodEnd: boolean;
+  };
+  usage: {
+    used: number;
+    limit: number;
+    remaining: number;
+    percentage: number;
+  };
+  checkoutAvailable: boolean;
+}
+
 const planLabels: Record<SettingsData["workspace"]["plan"], string> = {
   FREE: "Gratuito",
   PRO: "Pro",
@@ -63,6 +92,9 @@ const planLabels: Record<SettingsData["workspace"]["plan"], string> = {
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsData | null>(null);
   const [membersData, setMembersData] = useState<WorkspaceMembersData | null>(
+    null
+  );
+  const [billingData, setBillingData] = useState<BillingOverviewData | null>(
     null
   );
   const [loading, setLoading] = useState(true);
@@ -78,10 +110,12 @@ export default function SettingsPage() {
     Promise.all([
       fetch("/api/dashboard/stats").then((res) => res.json()),
       fetch("/api/workspace/members").then((res) => res.json()),
+      fetch("/api/billing/overview").then((res) => res.json()),
     ])
-      .then(([statsPayload, membersPayload]) => {
+      .then(([statsPayload, membersPayload, billingPayload]) => {
         if (statsPayload.success) setData(statsPayload.data);
         if (membersPayload.success) setMembersData(membersPayload.data);
+        if (billingPayload.success) setBillingData(billingPayload.data);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -219,6 +253,13 @@ export default function SettingsPage() {
   const currentPlanLabel = data
     ? planLabels[data.workspace.plan]
     : "Gratuito";
+  const monthlyPriceLabel =
+    billingData?.plan.monthlyPriceCents == null
+      ? "Preço em definição"
+      : new Intl.NumberFormat("pt-BR", {
+          style: "currency",
+          currency: billingData.plan.currency,
+        }).format(billingData.plan.monthlyPriceCents / 100);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -495,7 +536,19 @@ export default function SettingsPage() {
       <WorkspaceAuditLog />
 
       <section className="panel rounded p-4 sm:p-6">
-        <h2 className="mb-6 text-base font-semibold">Uso</h2>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Plano e uso</h2>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Visão transparente da assinatura deste espaço de trabalho.
+            </p>
+          </div>
+          {billingData && (
+            <span className="rounded-full border border-success/20 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+              {billingData.subscription.statusLabel}
+            </span>
+          )}
+        </div>
         <div className="flex items-center justify-between gap-3 border-b border-border py-3">
           <div>
             <p className="text-sm font-medium text-foreground">Plano atual</p>
@@ -504,21 +557,49 @@ export default function SettingsPage() {
             </p>
           </div>
           <span className="rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-sm font-semibold text-accent">
-            {currentPlanLabel}
+            {billingData?.plan.name ?? currentPlanLabel}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-3 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-border py-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Mensalidade</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Nenhum checkout ou pagamento automático está ativo.
+            </p>
+          </div>
+          <span className="text-sm font-semibold text-foreground">
+            {monthlyPriceLabel}
+          </span>
+        </div>
+        <div className="py-3">
           <div>
             <p className="text-sm font-medium text-foreground">
               Mensagens enviadas neste mês
             </p>
             <p className="text-xs text-muted mt-0.5">
-              Medição atual do espaço de trabalho.
+              {billingData
+                ? `${formatNumber(billingData.usage.used)} de ${formatNumber(billingData.usage.limit)} mensagens registradas.`
+                : "Medição atual do espaço de trabalho."}
             </p>
           </div>
-          <span className="text-sm font-semibold text-foreground">
-            {data?.workspace.dmsSentThisPeriod ?? 0}
-          </span>
+          <div
+            className="mt-3 h-2 overflow-hidden rounded-full bg-surface-hover"
+            role="progressbar"
+            aria-label="Uso mensal de mensagens"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={billingData?.usage.percentage ?? 0}
+          >
+            <div
+              className="h-full rounded-full bg-accent transition-[width]"
+              style={{ width: `${billingData?.usage.percentage ?? 0}%` }}
+            />
+          </div>
+          <p className="mt-2 text-right text-xs font-semibold text-muted">
+            {billingData
+              ? `${formatNumber(billingData.usage.percentage)}% utilizado`
+              : `${formatNumber(data?.workspace.dmsSentThisPeriod ?? 0)} mensagens`}
+          </p>
         </div>
       </section>
     </div>

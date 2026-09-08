@@ -164,7 +164,7 @@ Progresso validado em 5 de setembro de 2026:
 Objetivo: operar comercialmente com limites previsíveis.
 
 - [ ] Definir planos, preços e métricas de uso.
-- [ ] Criar modelos `Plan`, `Subscription`, `UsageRecord` e `BillingEvent`.
+- [x] Criar modelos `Plan`, `Subscription`, `UsageRecord` e `BillingEvent`.
 - [ ] Integrar provedor de cobrança com cartão e Pix.
 - [ ] Implementar trial, upgrade, downgrade e cancelamento.
 - [ ] Aplicar limites atomicamente no worker.
@@ -174,6 +174,13 @@ Objetivo: operar comercialmente com limites previsíveis.
 - [ ] Definir tolerância e bloqueio por inadimplência.
 
 Critério de saída: o sistema mede uso, cobra, altera planos e impede excesso sem perder eventos.
+
+Progresso validado em 8 de setembro de 2026:
+
+- Catálogo, assinatura atual, uso periódico e eventos idempotentes foram modelados sem ativar cobrança externa.
+- Workspaces existentes recebem assinatura manual e registro de uso por backfill, preservando o plano e o contador atuais.
+- A chave estrangeira composta entre evento, assinatura e workspace impede associação cruzada entre empresas no próprio PostgreSQL.
+- Preços pagos continuam pendentes de decisão comercial; esta etapa não cria checkout nem movimenta dinheiro.
 
 ## Marco 6 — Relatórios e administração
 

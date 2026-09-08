@@ -54,6 +54,14 @@ Depois de um downgrade, contas e integrantes acima do novo limite não são remo
 
 O dashboard e a tela de configurações exibem nome e capacidades do mesmo registro persistido. Assim, uma alteração administrativa no catálogo não depende de recompilar constantes da aplicação.
 
+## Atividade da assinatura
+
+Proprietários podem consultar em Configurações um histórico paginado dos eventos da assinatura, com filtros para processados, falhos, ignorados e pendentes. A API valida o cursor dentro do workspace e do filtro atual, e as contagens sempre pertencem ao espaço ativo.
+
+O retorno inclui somente estado, tipo, provedor, referência externa e datas necessárias ao suporte. O campo `metadata` nunca é selecionado. Motivos de falha passam por uma segunda camada de redação para remover tokens, cookies, senhas, cabeçalhos de autorização e referências a cartão antes de chegar ao navegador. Administradores e membros recebem `403`.
+
+Essa atividade é uma trilha operacional, não um histórico de faturas ou comprovantes. O portal financeiro permanece pendente da escolha do provedor e da definição comercial.
+
 ## Isolamento e idempotência
 
 - toda assinatura e todo registro de uso pertencem a exatamente um workspace;
@@ -75,4 +83,4 @@ npm run test:billing-db
 npm run test:billing-usage-db
 ```
 
-Para rollback, publique primeiro a versão anterior da aplicação; as tabelas e as colunas de cursor podem permanecer sem impacto. A versão anterior volta a usar as capacidades estáticas originais. Removê-las exige backup e uma migration reversa explícita. Não reverta manualmente em produção enquanto eventos de cobrança estiverem sendo gravados.
+Para rollback, publique primeiro a versão anterior da aplicação; as tabelas e as colunas de cursor podem permanecer sem impacto. A versão anterior volta a usar as capacidades estáticas originais e simplesmente deixa de exibir a atividade. Removê-las exige backup e uma migration reversa explícita. Não reverta manualmente em produção enquanto eventos de cobrança estiverem sendo gravados.

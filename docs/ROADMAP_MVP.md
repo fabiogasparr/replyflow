@@ -170,6 +170,7 @@ Objetivo: operar comercialmente com limites previsíveis.
 - [x] Aplicar limites de DMs atomicamente no worker.
 - [x] Limitar contas do Instagram e integrantes pelo plano persistido.
 - [ ] Definir e limitar a quantidade de workspaces por conta comercial.
+- [x] Exibir atividade técnica da assinatura com isolamento e paginação.
 - [ ] Criar portal de cobrança e histórico de faturas.
 - [ ] Processar webhooks de pagamento com idempotência.
 - [ ] Definir tolerância e bloqueio por inadimplência.
@@ -185,6 +186,7 @@ Progresso validado em 8 de setembro de 2026:
 - Estados cancelado e incompleto retornam ao Gratuito; trial, ativo e inadimplência temporária mantêm o plano até a política comercial definitiva.
 - O worker reserva uso no registro mensal com o limite persistido no plano; concorrência e compensação foram validadas em PostgreSQL real.
 - Conexões do Instagram, convites e dashboard usam o mesmo catálogo persistido; downgrades não removem recursos automaticamente.
+- Proprietários consultam eventos da assinatura sem acesso a metadados ou credenciais; administradores e membros não acessam a trilha financeira.
 - Preços pagos continuam pendentes de decisão comercial; esta etapa não cria checkout nem movimenta dinheiro.
 
 ## Marco 6 — Relatórios e administração

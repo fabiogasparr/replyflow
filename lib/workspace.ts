@@ -161,16 +161,36 @@ export async function createWorkspaceForUser(
   name: string
 ): Promise<Workspace> {
   const normalizedName = normalizeWorkspaceName(name);
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   return prisma.$transaction(async (transaction) => {
     const workspace = await transaction.workspace.create({
       data: {
         name: normalizedName,
         ownerId: userId,
+        usagePeriodStart: periodStart,
         members: {
           create: {
             userId,
             role: "OWNER",
+          },
+        },
+        subscription: {
+          create: {
+            planCode: "FREE",
+            provider: "MANUAL",
+            status: "ACTIVE",
+            currentPeriodStart: periodStart,
+          },
+        },
+        usageRecords: {
+          create: {
+            metric: "DM_SENT",
+            periodStart,
+            periodEnd,
+            quantity: 0,
           },
         },
       },

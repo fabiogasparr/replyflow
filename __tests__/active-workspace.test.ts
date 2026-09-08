@@ -187,6 +187,8 @@ describe("active workspace selection", () => {
       async (callback: (client: typeof transactionClient) => unknown) =>
         callback(transactionClient)
     );
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-08T12:00:00.000Z"));
 
     expect(normalizeWorkspaceName("  Loja   Aurora  ")).toBe("Loja Aurora");
     await expect(
@@ -196,7 +198,24 @@ describe("active workspace selection", () => {
       data: {
         name: "Loja Aurora",
         ownerId: "user_1",
+        usagePeriodStart: new Date(2026, 8, 1),
         members: { create: { userId: "user_1", role: "OWNER" } },
+        subscription: {
+          create: {
+            planCode: "FREE",
+            provider: "MANUAL",
+            status: "ACTIVE",
+            currentPeriodStart: new Date(2026, 8, 1),
+          },
+        },
+        usageRecords: {
+          create: {
+            metric: "DM_SENT",
+            periodStart: new Date(2026, 8, 1),
+            periodEnd: new Date(2026, 9, 1),
+            quantity: 0,
+          },
+        },
       },
     });
     expect(transactionClient.user.update).toHaveBeenCalledWith({
@@ -210,5 +229,6 @@ describe("active workspace selection", () => {
         action: "WORKSPACE_CREATED",
       }),
     });
+    vi.useRealTimers();
   });
 });

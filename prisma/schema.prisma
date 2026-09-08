@@ -95,9 +95,96 @@ model Workspace {
   auditEvents       AuditEvent[]
   contacts          Contact[]
   conversations     Conversation[]
+  subscription      Subscription?
+  usageRecords      UsageRecord[]
+  billingEvents     BillingEvent[]
 
   @@index([ownerId])
   @@index([archivedAt])
+}
+
+model Plan {
+  code              WorkspacePlan @id
+  name              String
+  currency          String        @default("BRL")
+  monthlyPriceCents Int?
+  monthlyDmLimit    Int
+  instagramAccounts Int
+  members           Int
+  isActive          Boolean       @default(true)
+  sortOrder         Int           @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  subscriptions Subscription[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  workspaceId            String             @unique
+  planCode               WorkspacePlan      @default(FREE)
+  provider               BillingProvider    @default(MANUAL)
+  status                 SubscriptionStatus @default(ACTIVE)
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  trialEndsAt            DateTime?
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  canceledAt             DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan          Plan           @relation(fields: [planCode], references: [code], onDelete: Restrict)
+  billingEvents BillingEvent[]
+
+  @@unique([id, workspaceId])
+  @@unique([provider, providerCustomerId])
+  @@unique([provider, providerSubscriptionId])
+  @@index([planCode, status])
+  @@index([provider, status])
+}
+
+model UsageRecord {
+  id          String      @id @default(cuid())
+  workspaceId String
+  metric      UsageMetric
+  periodStart DateTime
+  periodEnd   DateTime
+  quantity    Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, metric, periodStart])
+  @@index([workspaceId, periodStart, periodEnd])
+}
+
+model BillingEvent {
+  id              String             @id @default(cuid())
+  workspaceId     String
+  subscriptionId  String?
+  provider        BillingProvider
+  providerEventId String
+  type            String
+  status          BillingEventStatus @default(PENDING)
+  occurredAt      DateTime
+  processedAt     DateTime?
+  failureReason   String?
+  metadata        Json?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@unique([provider, providerEventId])
+  @@index([workspaceId, createdAt])
+  @@index([status, createdAt])
 }
 
 model WorkspaceMember {
@@ -477,6 +564,31 @@ enum WorkspacePlan {
   FREE
   PRO
   AGENCY
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum BillingProvider {
+  MANUAL
+  MERCADO_PAGO
+  STRIPE
+}
+
+enum BillingEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum UsageMetric {
+  DM_SENT
 }
 
 enum WorkspaceInvitationStatus {

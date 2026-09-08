@@ -197,9 +197,9 @@ Objetivo: dar visibilidade ao cliente e à operação do SaaS.
 - [ ] Criar filtros por conta, workspace e período.
 - [ ] Criar relatórios compartilháveis com marca do cliente.
 - [x] Implementar painel global de clientes, planos e uso, inicialmente somente leitura.
-- [ ] Exibir contas com tokens vencidos e workers indisponíveis.
+- [x] Exibir contas com tokens vencidos e workers indisponíveis.
 - [ ] Criar ferramentas seguras de suporte e reprocessamento.
-- [ ] Adicionar alertas de fila, webhook, autenticação e cobrança.
+- [x] Adicionar alertas no painel para fila, webhook, autenticação e cobrança.
 
 Critério de saída: clientes acompanham resultados e a equipe administra incidentes sem acessar diretamente o banco.
 
@@ -211,6 +211,10 @@ Progresso validado em 8 de setembro de 2026:
 - Tanto a página quanto a API revalidam o papel persistido; usuários comuns não recebem o item de navegação e são bloqueados no servidor.
 - Tokens da Meta, mensagens, metadados financeiros e ferramentas de impersonação não fazem parte da resposta.
 - Migration, backfill, padrão seguro e índice foram validados após as 28 migrations anteriores em PostgreSQL descartável. Impacto e rollback estão em `docs/PLATFORM_ADMIN.md`.
+- A central global acompanha PostgreSQL, Redis, fila, heartbeat do worker e prontidão do login por e-mail, com atualização automática a cada 30 segundos.
+- Métricas de webhooks, DMs e eventos operacionais comparam janelas móveis de 1 hora, 24 horas e 7 dias ao período anterior equivalente e sinalizam anomalias.
+- Workspaces afetados são priorizados por contagens agregadas de incidentes; payloads, mensagens, jobs, tokens e erros internos permanecem fora da resposta.
+- Seis índices aditivos para consultas globais foram aprovados após as 30 migrations reais em schema descartável. Critérios, privacidade e rollback estão em `docs/PLATFORM_OBSERVABILITY.md`.
 
 ## Marco 7 — Expansões posteriores ao MVP
 

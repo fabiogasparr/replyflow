@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentWorkspaceContext, subscriptionFindUnique } = vi.hoisted(
-  () => ({
-    getCurrentWorkspaceContext: vi.fn(),
-    subscriptionFindUnique: vi.fn(),
-  })
-);
+const {
+  getCurrentWorkspaceContext,
+  subscriptionFindUnique,
+  usageRecordFindUnique,
+} = vi.hoisted(() => ({
+  getCurrentWorkspaceContext: vi.fn(),
+  subscriptionFindUnique: vi.fn(),
+  usageRecordFindUnique: vi.fn(),
+}));
 
 vi.mock("@/lib/workspace-access", () => ({ getCurrentWorkspaceContext }));
 vi.mock("@/lib/db/client", () => ({
-  prisma: { subscription: { findUnique: subscriptionFindUnique } },
+  prisma: {
+    subscription: { findUnique: subscriptionFindUnique },
+    usageRecord: { findUnique: usageRecordFindUnique },
+  },
 }));
 
 import { GET } from "@/app/api/billing/overview/route";
@@ -19,8 +25,12 @@ beforeEach(() => {
   getCurrentWorkspaceContext.mockResolvedValue({
     workspaceId: "workspace_1",
     role: "OWNER",
-    workspace: { dmsSentThisPeriod: 125 },
+    workspace: {
+      dmsSentThisPeriod: 125,
+      usagePeriodStart: new Date("2026-09-01T00:00:00.000Z"),
+    },
   });
+  usageRecordFindUnique.mockResolvedValue({ quantity: 140 });
   subscriptionFindUnique.mockResolvedValue({
     provider: "MANUAL",
     status: "ACTIVE",
@@ -58,11 +68,21 @@ describe("GET /api/billing/overview", () => {
     expect(subscriptionFindUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { workspaceId: "workspace_1" } })
     );
+    expect(usageRecordFindUnique).toHaveBeenCalledWith({
+      where: {
+        workspaceId_metric_periodStart: {
+          workspaceId: "workspace_1",
+          metric: "DM_SENT",
+          periodStart: new Date("2026-09-01T00:00:00.000Z"),
+        },
+      },
+      select: { quantity: true },
+    });
     expect(payload.data.usage).toEqual({
-      used: 125,
+      used: 140,
       limit: 2_000,
-      remaining: 1_875,
-      percentage: 6.3,
+      remaining: 1_860,
+      percentage: 7,
     });
     expect(payload.data.subscription.statusLabel).toBe("Ativa");
     expect(payload.data.checkoutAvailable).toBe(false);
@@ -74,5 +94,14 @@ describe("GET /api/billing/overview", () => {
     const response = await GET();
 
     expect(response.status).toBe(409);
+  });
+
+  it("falls back to the legacy counter during a compatible deployment", async () => {
+    usageRecordFindUnique.mockResolvedValue(null);
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(payload.data.usage.used).toBe(125);
   });
 });

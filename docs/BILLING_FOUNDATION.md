@@ -9,7 +9,7 @@ Esta etapa cria o domínio persistente necessário para cobrança sem ativar pag
 - `UsageRecord`: medição por workspace, métrica e período;
 - `BillingEvent`: trilha idempotente dos eventos recebidos de um provedor.
 
-A migration cria os três planos atuais, gera uma assinatura manual para cada workspace existente e copia o contador mensal de DMs para `UsageRecord`. O campo `Workspace.plan` e os contadores atuais continuam sendo a fonte de aplicação dos limites nesta entrega, permitindo publicar aplicação e worker antes ou depois da migration.
+A migration cria os três planos atuais, gera uma assinatura manual para cada workspace existente e copia o contador mensal de DMs para `UsageRecord`. O campo `Workspace.plan` e o contador anterior permanecem como espelhos de compatibilidade para permitir implantações graduais.
 
 ## Decisões comerciais ainda abertas
 
@@ -38,6 +38,14 @@ O serviço interno `processSubscriptionEvent` prepara a aplicação para receber
 
 Preços, duração da tolerância, política de tentativas e ações iniciadas pelo cliente continuam pendentes de decisão comercial. O processador não cria cobrança, checkout, reembolso ou assinatura no provedor.
 
+## Medição e limite de DMs
+
+Antes de cada envio, o worker reserva uma unidade no `UsageRecord` do mês usando uma atualização condicional no PostgreSQL. O limite vem de `Plan.monthlyDmLimit`, alcançando imediatamente todos os handlers do worker que já usam a reserva central. Se duas tarefas disputarem a última unidade, somente uma avança.
+
+A reserva, a criação do período e o contador de compatibilidade do workspace fazem parte da mesma transação. Falha antes do envio ou resposta rejeitada pela Meta libera a unidade no mesmo período; uma compensação antiga não reduz o mês atual. A visão de cobrança lê `UsageRecord` e usa o contador anterior somente como fallback durante implantação gradual.
+
+Os três planos continuam configurados com 2 bilhões de DMs mensais, portanto esta entrega ativa a infraestrutura de aplicação do limite sem reduzir a capacidade comercial existente. Alterar esse número passa a ter efeito operacional e deve ser tratado como decisão comercial, com comunicação e monitoramento.
+
 ## Isolamento e idempotência
 
 - toda assinatura e todo registro de uso pertencem a exatamente um workspace;
@@ -56,6 +64,7 @@ Valide em PostgreSQL local com:
 
 ```bash
 npm run test:billing-db
+npm run test:billing-usage-db
 ```
 
 Para rollback, publique primeiro a versão anterior da aplicação; as tabelas e as colunas de cursor podem permanecer sem impacto. Removê-las exige backup e uma migration reversa explícita. Não reverta manualmente em produção enquanto eventos de cobrança estiverem sendo gravados.

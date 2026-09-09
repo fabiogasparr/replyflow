@@ -1,10 +1,23 @@
+import { Prisma } from "@/app/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
 import {
   calculateCtr,
   normalizeTopKeywords,
   summarizeDmStatuses,
 } from "@/lib/tracking/analytics";
-import { buildReportUrl, isReportBranded } from "@/lib/reports/share";
+import { resolvePerformancePeriod, type ReportPreset } from "@/lib/reports/performance";
+import {
+  buildReportUrl,
+  getBrandInitials,
+  getReadableTextColor,
+  isReportBranded,
+} from "@/lib/reports/share";
+
+type DailyMetricRow = {
+  day: string;
+  metric: "SENT" | "CLICK";
+  count: number | bigint;
+};
 
 function getHostname(url: string) {
   try {
@@ -14,18 +27,22 @@ function getHostname(url: string) {
   }
 }
 
-function getDayWindow(daysAgo: number) {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  start.setDate(start.getDate() - daysAgo);
-
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-
-  return { start, end };
+function addDays(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
-export async function getCampaignReportBySlug(shareSlug: string) {
+function deliveryRate(sent: number, failed: number) {
+  const attempted = sent + failed;
+  return attempted === 0 ? 0 : Math.round((sent / attempted) * 1_000) / 10;
+}
+
+export async function getCampaignReportBySlug(
+  shareSlug: string,
+  now = new Date()
+) {
   const automation = await prisma.automation.findFirst({
     where: {
       reportShareSlug: shareSlug,
@@ -42,9 +59,13 @@ export async function getCampaignReportBySlug(shareSlug: string) {
       createdAt: true,
       updatedAt: true,
       reportShareSlug: true,
+      reportSharePeriodDays: true,
+      reportSharePublishedAt: true,
       workspace: {
         select: {
           name: true,
+          reportBrandName: true,
+          reportBrandColor: true,
         },
       },
       instagramAccount: {
@@ -57,51 +78,74 @@ export async function getCampaignReportBySlug(shareSlug: string) {
           id: true,
           slug: true,
           destinationUrl: true,
-          _count: { select: { clicks: true } },
         },
         orderBy: { createdAt: "asc" },
       },
     },
   });
 
-  if (!automation || !automation.reportShareSlug) {
-    return null;
-  }
+  if (!automation?.reportShareSlug) return null;
 
-  const [statusRows, clickCount, keywordRows, latestSentLog] =
+  const periodDays = [7, 30, 90].includes(automation.reportSharePeriodDays)
+    ? automation.reportSharePeriodDays
+    : 30;
+  const period = resolvePerformancePeriod(
+    { preset: `${periodDays}d` as ReportPreset },
+    now
+  );
+  const metricWhere = {
+    workspaceId: automation.workspaceId,
+    automationId: automation.id,
+    createdAt: { gte: period.start, lt: period.endExclusive },
+  };
+
+  const [statusRows, clickRows, keywordRows, latestSentLog, dailyRows] =
     await Promise.all([
       prisma.dmLog.groupBy({
         by: ["status"],
-        where: {
-          workspaceId: automation.workspaceId,
-          automationId: automation.id,
-        },
+        where: metricWhere,
         _count: { _all: true },
       }),
-      prisma.linkClick.count({
-        where: {
-          workspaceId: automation.workspaceId,
-          automationId: automation.id,
-        },
+      prisma.linkClick.groupBy({
+        by: ["trackedLinkId"],
+        where: metricWhere,
+        _count: { _all: true },
       }),
       prisma.dmLog.groupBy({
         by: ["matchedKeyword"],
-        where: {
-          workspaceId: automation.workspaceId,
-          automationId: automation.id,
-          matchedKeyword: { not: null },
-        },
+        where: { ...metricWhere, matchedKeyword: { not: null } },
         _count: { _all: true },
       }),
       prisma.dmLog.findFirst({
-        where: {
-          workspaceId: automation.workspaceId,
-          automationId: automation.id,
-          status: "SENT",
-        },
+        where: { ...metricWhere, status: "SENT" },
         orderBy: { dmSentAt: "desc" },
         select: { dmSentAt: true, createdAt: true },
       }),
+      prisma.$queryRaw<DailyMetricRow[]>(Prisma.sql`
+        SELECT
+          TO_CHAR(("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${period.timeZone})::date, 'YYYY-MM-DD') AS day,
+          'SENT'::text AS metric,
+          COUNT(*)::int AS count
+        FROM "DmLog"
+        WHERE "workspaceId" = ${automation.workspaceId}
+          AND "automationId" = ${automation.id}
+          AND "createdAt" >= ${period.start}
+          AND "createdAt" < ${period.endExclusive}
+          AND "status" = 'SENT'::"DmStatus"
+        GROUP BY 1
+        UNION ALL
+        SELECT
+          TO_CHAR(("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${period.timeZone})::date, 'YYYY-MM-DD') AS day,
+          'CLICK'::text AS metric,
+          COUNT(*)::int AS count
+        FROM "LinkClick"
+        WHERE "workspaceId" = ${automation.workspaceId}
+          AND "automationId" = ${automation.id}
+          AND "createdAt" >= ${period.start}
+          AND "createdAt" < ${period.endExclusive}
+        GROUP BY 1
+        ORDER BY 1 ASC, 2 ASC
+      `),
     ]);
 
   const statusSummary = summarizeDmStatuses(
@@ -110,52 +154,58 @@ export async function getCampaignReportBySlug(shareSlug: string) {
       _count: row._count._all,
     }))
   );
+  const clickCounts = new Map(
+    clickRows.map((row) => [row.trackedLinkId, row._count._all])
+  );
+  const clickCount = clickRows.reduce(
+    (total, row) => total + row._count._all,
+    0
+  );
   const topKeywords = normalizeTopKeywords(
     keywordRows.map((row) => ({
       matchedKeyword: row.matchedKeyword,
       _count: row._count._all,
     }))
   );
-  const daily = await Promise.all(
-    Array.from({ length: 7 }, async (_, index) => {
-      const daysAgo = 6 - index;
-      const { start, end } = getDayWindow(daysAgo);
-      const [sent, clicks] = await Promise.all([
-        prisma.dmLog.count({
-          where: {
-            workspaceId: automation.workspaceId,
-            automationId: automation.id,
-            status: "SENT",
-            createdAt: { gte: start, lt: end },
-          },
-        }),
-        prisma.linkClick.count({
-          where: {
-            workspaceId: automation.workspaceId,
-            automationId: automation.id,
-            createdAt: { gte: start, lt: end },
-          },
-        }),
-      ]);
 
-      return {
-        date: start.toLocaleDateString("pt-BR", {
-          month: "short",
-          day: "numeric",
-        }),
-        sent,
-        clicks,
-      };
+  const dailyByKey = new Map<
+    string,
+    { date: string; sent: number; clicks: number }
+  >(
+    Array.from({ length: period.dayCount }, (_, index) => {
+      const date = addDays(period.from, index);
+      return [date, { date, sent: 0, clicks: 0 }];
     })
   );
+  for (const row of dailyRows) {
+    const day = dailyByKey.get(row.day);
+    if (!day) continue;
+    if (row.metric === "SENT") day.sent += Number(row.count);
+    if (row.metric === "CLICK") day.clicks += Number(row.count);
+  }
+
+  const brandName = automation.workspace.reportBrandName ?? automation.workspace.name;
+  const brandColor = automation.workspace.reportBrandColor;
 
   return {
     shareSlug: automation.reportShareSlug,
     reportUrl: buildReportUrl(automation.reportShareSlug),
-    generatedAt: new Date(),
+    generatedAt: now,
     branded: isReportBranded(),
+    branding: {
+      name: brandName,
+      color: brandColor,
+      textColor: getReadableTextColor(brandColor),
+      initials: getBrandInitials(brandName),
+    },
     workspace: {
       name: automation.workspace.name,
+    },
+    period: {
+      days: periodDays,
+      from: period.from,
+      to: period.to,
+      timeZone: period.timeZone,
     },
     campaign: {
       name: automation.name,
@@ -165,6 +215,7 @@ export async function getCampaignReportBySlug(shareSlug: string) {
       isActive: automation.isActive,
       createdAt: automation.createdAt,
       updatedAt: automation.updatedAt,
+      publishedAt: automation.reportSharePublishedAt,
       instagramUsername: automation.instagramAccount.username,
     },
     metrics: {
@@ -173,14 +224,24 @@ export async function getCampaignReportBySlug(shareSlug: string) {
       failed: statusSummary.failed,
       clicks: clickCount,
       ctr: calculateCtr(clickCount, statusSummary.sent),
+      deliveryRate: deliveryRate(statusSummary.sent, statusSummary.failed),
       latestSentAt: latestSentLog?.dmSentAt ?? latestSentLog?.createdAt ?? null,
     },
     topKeywords,
-    daily,
+    daily: [...dailyByKey.values()],
     trackedLinks: automation.trackedLinks.map((link) => ({
       slug: link.slug,
       destinationHost: getHostname(link.destinationUrl),
-      clicks: link._count.clicks,
+      clicks: clickCounts.get(link.id) ?? 0,
     })),
+    conversion: {
+      available: false,
+      reason:
+        "Vendas exigem um evento comercial integrado; cliques não são apresentados como conversões.",
+    },
   };
 }
+
+export type CampaignSharedReport = NonNullable<
+  Awaited<ReturnType<typeof getCampaignReportBySlug>>
+>;

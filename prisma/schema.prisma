@@ -84,6 +84,8 @@ model Workspace {
 
   usagePeriodStart  DateTime @default(now())
   dmsSentThisPeriod Int      @default(0)
+  reportBrandName   String?
+  reportBrandColor  String   @default("#112620")
 
   members           WorkspaceMember[]
   activeUsers       User[]                @relation("UserActiveWorkspace")
@@ -374,7 +376,10 @@ model Automation {
   isActive                Boolean  @default(true)
   wholeWordMatch          Boolean  @default(true)
   reportShareSlug         String?  @unique
-  reportShareEnabled      Boolean  @default(true)
+  reportShareEnabled      Boolean  @default(false)
+  reportSharePeriodDays   Int      @default(30)
+  reportSharePublishedAt  DateTime?
+  reportShareRevokedAt    DateTime?
 
   // Operational projection maintained by the worker. It is intentionally
   // separate from isActive: an enabled campaign can still need attention when

@@ -14,6 +14,7 @@ import type {
   ReportPreset,
   WorkspacePerformanceReport,
 } from "@/lib/reports/performance";
+import ReportSharingManager from "@/components/report-sharing-manager";
 
 type AppliedFilters = {
   preset: ReportPreset;
@@ -265,16 +266,19 @@ export default function PerformanceReport() {
               Entenda o caminho do comentário ao clique, compare períodos e descubra quais automações geram mais intenção.
             </p>
           </div>
-          <a
-            href={exportUrl}
-            download
-            className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#f5c451]/45 bg-[#f5c451] px-4 py-2.5 text-sm font-bold text-[#112620] transition hover:bg-[#ffda72]"
-          >
+          <div className="flex flex-wrap gap-2">
+            <a href="#compartilhamento" className="inline-flex w-fit items-center rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-[#f5c451]/50 hover:text-[#f5c451]">Compartilhar</a>
+            <a
+              href={exportUrl}
+              download
+              className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#f5c451]/45 bg-[#f5c451] px-4 py-2.5 text-sm font-bold text-[#112620] transition hover:bg-[#ffda72]"
+            >
             <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-2" aria-hidden="true">
               <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Exportar CSV
-          </a>
+              Exportar CSV
+            </a>
+          </div>
         </div>
       </section>
 
@@ -551,6 +555,8 @@ export default function PerformanceReport() {
           </dl>
         </div>
       </section>
+
+      <ReportSharingManager />
     </div>
   );
 }

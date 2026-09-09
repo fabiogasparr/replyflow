@@ -19,6 +19,10 @@ export const AUDIT_ACTIONS = {
   conversationUpdated: "CONVERSATION_UPDATED",
   conversationMessageSent: "CONVERSATION_MESSAGE_SENT",
   dmRetryRequested: "DM_RETRY_REQUESTED",
+  reportBrandUpdated: "REPORT_BRAND_UPDATED",
+  reportPublished: "REPORT_PUBLISHED",
+  reportRevoked: "REPORT_REVOKED",
+  reportLinkRotated: "REPORT_LINK_ROTATED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

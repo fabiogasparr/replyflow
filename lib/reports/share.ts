@@ -14,7 +14,22 @@ export function buildReportUrl(slug: string, baseUrl?: string) {
   return `${resolvedBaseUrl.replace(/\/$/, "")}/reports/${slug}`;
 }
 
-// Self-hosted build: reports are never branded.
 export function isReportBranded() {
-  return false;
+  return true;
+}
+
+export function getBrandInitials(name: string) {
+  const words = name.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (words.length === 0) return "RF";
+  return `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`.toUpperCase();
+}
+
+export function getReadableTextColor(hexColor: string) {
+  const fallback = "#112620";
+  const normalized = /^#[0-9A-Fa-f]{6}$/.test(hexColor) ? hexColor : fallback;
+  const red = Number.parseInt(normalized.slice(1, 3), 16);
+  const green = Number.parseInt(normalized.slice(3, 5), 16);
+  const blue = Number.parseInt(normalized.slice(5, 7), 16);
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1_000;
+  return luminance > 150 ? "#112620" : "#FFFFFF";
 }

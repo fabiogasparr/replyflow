@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/client";
 import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
-import { generateReportShareSlug } from "@/lib/reports/share";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import {
   canManageAutomations,
@@ -105,7 +104,8 @@ export async function POST(request: NextRequest) {
         wholeWordMatch: campaign.wholeWordMatch,
         workspaceId: context.workspaceId,
         instagramAccountId: account.id,
-        reportShareSlug: generateReportShareSlug(),
+        reportShareSlug: null,
+        reportShareEnabled: false,
         ...(validTrackedUrl
           ? {
               trackedLinks: {

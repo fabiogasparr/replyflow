@@ -25,6 +25,7 @@
     "test:platform-observability-db": "tsx scripts/test-platform-observability-db.ts",
     "test:performance-reporting-db": "tsx scripts/test-performance-reporting-db.ts",
     "test:report-sharing-db": "tsx scripts/test-report-sharing-db.ts",
+    "test:platform-support-db": "tsx scripts/test-platform-support-db.ts",
     "admin:role": "tsx scripts/set-platform-admin.ts"
   },
   "dependencies": {

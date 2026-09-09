@@ -198,7 +198,7 @@ Objetivo: dar visibilidade ao cliente e à operação do SaaS.
 - [x] Criar relatórios compartilháveis com marca do cliente.
 - [x] Implementar painel global de clientes, planos e uso, inicialmente somente leitura.
 - [x] Exibir contas com tokens vencidos e workers indisponíveis.
-- [ ] Criar ferramentas seguras de suporte e reprocessamento.
+- [x] Criar ferramentas seguras de suporte e reprocessamento.
 - [x] Adicionar alertas no painel para fila, webhook, autenticação e cobrança.
 
 Critério de saída: clientes acompanham resultados e a equipe administra incidentes sem acessar diretamente o banco.
@@ -221,6 +221,9 @@ Progresso validado em 8 e 9 de setembro de 2026:
 - Relatórios públicos agora nascem privados, aceitam marca e período de 7, 30 ou 90 dias e podem ter o endereço renovado ou revogado por proprietários e administradores.
 - A página compartilhada expõe somente métricas agregadas, bloqueia indexação, evita recursos remotos da marca e invalida o slug antigo ao renovar ou revogar.
 - Defaults, preservação dos links legados e constraints de cor/período foram aprovados após as 32 migrations reais em schema descartável. Impacto e rollback estão em `docs/SHARED_REPORTS.md`.
+- A central global de suporte lista somente metadados operacionais, sem conteúdo ou identidade de contatos, e não oferece impersonação nem ações em lote.
+- Reprocessamentos globais exigem confirmação pelo nome da empresa, workspace ativo, credencial válida e heartbeat recente; a mesma reserva concorrente e compensação da fila atendem suporte e clientes.
+- O índice de triagem foi aprovado após as 33 migrations reais em schema descartável. Autorizações, auditoria e rollback estão em `docs/PLATFORM_SUPPORT.md`.
 - O CSV contém somente dados agregados, desativa fórmulas de planilha e não permite cache. Conversão em venda permanece indisponível até existir um evento comercial real; detalhes e rollback estão em `docs/PERFORMANCE_REPORTS.md`.
 
 ## Marco 7 — Expansões posteriores ao MVP

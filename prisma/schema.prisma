@@ -459,6 +459,7 @@ model DmLog {
   @@index([automationId])
   @@index([instagramAccountId])
   @@index([status])
+  @@index([status, updatedAt, id])
   @@index([updatedAt])
 }
 

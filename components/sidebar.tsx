@@ -20,6 +20,7 @@ import type { UserWorkspaceOption } from "@/lib/workspace";
 const navIcons: Record<DashboardNavKey, React.ReactNode> = {
   dashboard: <path d="M4 13h6V4H4v9Zm10 7h6V11h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z" />,
   overview: <path d="M4 19V9m5 10V5m6 14v-7m5 7V3" />,
+  reports: <path d="M5 3h14v18H5V3Zm4 5h6m-6 4h2m2 0h2m-6 4h2m2 0h2" />,
   inbox: <path d="M4 6h16v11H8l-4 4V6Zm4 4h8m-8 3h5" />,
   contacts: <path d="M16 20v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2m12-8a3 3 0 0 1 3 3v3M10 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm7 1a3 3 0 0 1 0 6" />,
   campaigns: <path d="m5 16 5-5m0 0 3-3 6 6-3 3-6-6Zm-5 5h4m11-15 2-2m3 6h3" />,

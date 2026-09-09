@@ -6,17 +6,21 @@
  * Two-pane campaign editor: a control panel on the left and a live phone
  * preview on the right. Used for both creating and editing a campaign.
  *
- * Turn 1 wires the fully-functional pieces: trigger scope (specific / any /
- * next post), match mode (specific words / any word), the opening + reveal DM
- * text, public reply, and the tracked link. Button-driven delivery and the
- * follow / email / follow-up steps arrive in later turns.
+ * The visual map and detailed form edit one shared state. The map projects the
+ * execution contract already supported by the worker; the form owns the full
+ * content controls and Instagram preview.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
+import AutomationFlowMap from "@/components/automation-flow-map";
 import PostPicker from "@/components/post-picker";
 import CampaignPreview, { type PreviewTab } from "@/components/campaign-preview";
+import {
+  buildAutomationFlow,
+  type AutomationFlowNodeId,
+} from "@/lib/automations/flow-map";
 import { readCache, writeCache } from "@/lib/client-cache";
 import {
   IMPORT_QUEUE_KEY,
@@ -62,14 +66,16 @@ interface CampaignBuilderProps {
 }
 
 function Section({
+  id,
   title,
   children,
 }: {
+  id?: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-3">
+    <div id={id} className="scroll-mt-6 space-y-3">
       <h2 className="text-sm font-semibold text-foreground">{title}</h2>
       {children}
     </div>
@@ -182,6 +188,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
   const [followUpDelayMinutes, setFollowUpDelayMinutes] = useState(0);
 
   const [previewTab, setPreviewTab] = useState<PreviewTab>("dm");
+  const [builderView, setBuilderView] = useState<"map" | "form">("map");
 
   // CSV import queue. When present, each save advances to the next row instead
   // of returning to the campaigns list.
@@ -356,6 +363,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       if (!Array.isArray(queue) || queue.length === 0) return;
       setImportQueue(queue);
       setImportTotal(queue.length);
+      setBuilderView("form");
       if (acct) setSelectedAccountId(acct);
       prefillFromRow(queue[0]);
     } catch {
@@ -366,6 +374,79 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
 
   const username =
     accounts.find((a) => a.id === selectedAccountId)?.username ?? "suamarca";
+
+  const flow = useMemo(
+    () =>
+      buildAutomationFlow({
+        triggerScope,
+        postSelected: Boolean(postId),
+        matchMode,
+        keywords,
+        dmTriggerEnabled,
+        publicReplyEnabled,
+        publicReplyMessages,
+        openingDmEnabled,
+        openingDmMessage,
+        openingDmButtonLabel,
+        requireFollow,
+        followPromptMessage,
+        followPromptButtonLabel,
+        dmMessage,
+        primaryLinkEnabled: linkOpen && Boolean(trackedDestinationUrl.trim()),
+        secondaryLinkEnabled:
+          secondLinkOpen && Boolean(secondaryDestinationUrl.trim()),
+        followUpEnabled,
+        followUpMessage,
+        followUpDelayMinutes,
+      }),
+    [
+      dmMessage,
+      dmTriggerEnabled,
+      followPromptButtonLabel,
+      followPromptMessage,
+      followUpDelayMinutes,
+      followUpEnabled,
+      followUpMessage,
+      keywords,
+      linkOpen,
+      matchMode,
+      openingDmButtonLabel,
+      openingDmEnabled,
+      openingDmMessage,
+      postId,
+      publicReplyEnabled,
+      publicReplyMessages,
+      requireFollow,
+      secondLinkOpen,
+      secondaryDestinationUrl,
+      trackedDestinationUrl,
+      triggerScope,
+    ]
+  );
+
+  function toggleFlowNode(nodeId: AutomationFlowNodeId) {
+    if (nodeId === "public-reply") setPublicReplyEnabled((value) => !value);
+    if (nodeId === "opening-dm") setOpeningDmEnabled((value) => !value);
+    if (nodeId === "follow-gate") setRequireFollow((value) => !value);
+    if (nodeId === "follow-up") setFollowUpEnabled((value) => !value);
+  }
+
+  function openFlowNode(nodeId: AutomationFlowNodeId) {
+    const targetByNode: Record<AutomationFlowNodeId, string> = {
+      trigger: "flow-step-trigger",
+      "public-reply": "flow-step-public-reply",
+      "opening-dm": "flow-step-opening-dm",
+      "follow-gate": "flow-step-follow-gate",
+      delivery: "flow-step-delivery",
+      "follow-up": "flow-step-follow-up",
+    };
+    setBuilderView("form");
+    window.setTimeout(() => {
+      document
+        .getElementById(targetByNode[nodeId])
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
 
   function handlePostSelect(
     id: string,
@@ -422,7 +503,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       requireFollow,
       followPromptMessage: requireFollow ? followPromptMessage.trim() : "",
       followPromptButtonLabel: requireFollow
-        ? followPromptButtonLabel.trim() || "i'm following"
+        ? followPromptButtonLabel.trim() || "Já estou seguindo"
         : "",
       followUpEnabled,
       followUpMessage: followUpEnabled ? followUpMessage.trim() : "",
@@ -626,9 +707,50 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface/80 p-2">
+        <div className="flex rounded-xl bg-background p-1" role="tablist" aria-label="Modo do construtor">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={builderView === "map"}
+            onClick={() => setBuilderView("map")}
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition ${
+              builderView === "map"
+                ? "bg-[#112620] text-white shadow-sm"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            Mapa do fluxo
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={builderView === "form"}
+            onClick={() => setBuilderView("form")}
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition ${
+              builderView === "form"
+                ? "bg-[#112620] text-white shadow-sm"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            Conteúdo e prévia
+          </button>
+        </div>
+        <p className="px-2 text-[11px] text-muted">
+          Visualize a jornada ou refine cada mensagem antes de salvar.
+        </p>
+      </div>
+
+      {builderView === "map" ? (
+        <AutomationFlowMap
+          flow={flow}
+          onToggleNode={toggleFlowNode}
+          onEditNode={openFlowNode}
+        />
+      ) : (
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr] lg:gap-8">
       {/* min-w-0 on the cells: a grid item defaults to min-width:auto, so a
           long string widens the whole page instead of wrapping. */}
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr] lg:gap-8">
       {/* Left: controls */}
       <div className="space-y-8 min-w-0">
         {error && (
@@ -667,7 +789,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
           )}
         </div>
 
-        <Section title="Quando alguém comentar em">
+        <Section id="flow-step-trigger" title="Quando alguém comentar em">
           <Radio
             checked={triggerScope === "specific"}
             onSelect={() => setTriggerScope("specific")}
@@ -739,17 +861,18 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 : "Uma DM com qualquer uma dessas palavras receberá a mesma resposta, sem precisar de comentário."}
             </p>
           )}
-          <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-            <span className="text-sm text-foreground">
-              responder publicamente aos comentários no post
-            </span>
-            <Toggle
-              on={publicReplyEnabled}
-              onToggle={() => setPublicReplyEnabled(!publicReplyEnabled)}
-            />
-          </div>
-          {publicReplyEnabled && (
-            <div className="space-y-2">
+          <div id="flow-step-public-reply" className="scroll-mt-6 space-y-3">
+            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+              <span className="text-sm text-foreground">
+                responder publicamente aos comentários no post
+              </span>
+              <Toggle
+                on={publicReplyEnabled}
+                onToggle={() => setPublicReplyEnabled(!publicReplyEnabled)}
+              />
+            </div>
+            {publicReplyEnabled && (
+              <div className="space-y-2">
               {publicReplyMessages.map((msg, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <input
@@ -794,12 +917,13 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 Uma resposta é escolhida aleatoriamente para que os comentários
                 não pareçam idênticos.
               </p>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </Section>
 
         <Section title="A pessoa receberá">
-          <div className="rounded-lg border border-border p-3">
+          <div id="flow-step-opening-dm" className="scroll-mt-6 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground">uma DM inicial</span>
               <Toggle
@@ -827,7 +951,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               </div>
             )}
           </div>
-          <div className="mt-3 rounded-lg border border-border p-3">
+          <div id="flow-step-follow-gate" className="scroll-mt-6 mt-3 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground">
                 uma solicitação para seguir o perfil primeiro
@@ -864,7 +988,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
           </div>
         </Section>
 
-        <Section title="Depois, a pessoa receberá">
+        <Section id="flow-step-delivery" title="Depois, a pessoa receberá">
           <div className="rounded-lg border border-border p-3 space-y-2">
             <span className="text-sm text-foreground">uma DM com um link</span>
             <textarea
@@ -930,7 +1054,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               {"{link}"} insere o link rastreado; {"{username}"} personaliza a mensagem.
             </p>
           </div>
-          <div className="mt-3 rounded-lg border border-border p-3">
+          <div id="flow-step-follow-up" className="scroll-mt-6 mt-3 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground">
                 uma mensagem de agradecimento posterior
@@ -1009,7 +1133,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
             secondLinkButtonLabel={secondaryButtonLabel || "Abrir link"}
             requireFollow={requireFollow}
             followPromptMessage={followPromptMessage}
-            followPromptButtonLabel={followPromptButtonLabel || "i'm following"}
+            followPromptButtonLabel={followPromptButtonLabel || "Já estou seguindo"}
             followUpEnabled={followUpEnabled}
             followUpMessage={followUpMessage}
             followUpDelayMinutes={followUpDelayMinutes}
@@ -1017,6 +1141,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         </div>
       </div>
       </div>
+      )}
     </div>
   );
 }

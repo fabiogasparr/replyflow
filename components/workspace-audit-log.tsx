@@ -32,6 +32,10 @@ const actionLabels: Record<string, string> = {
   CONTACT_UPDATED: "atualizou um contato",
   CONVERSATION_UPDATED: "organizou uma conversa",
   CONVERSATION_MESSAGE_SENT: "respondeu uma conversa",
+  REPORT_BRAND_UPDATED: "atualizou a marca dos relatórios",
+  REPORT_PUBLISHED: "publicou um relatório de campanha",
+  REPORT_REVOKED: "revogou um relatório de campanha",
+  REPORT_LINK_ROTATED: "renovou o endereço de um relatório",
 };
 
 export default function WorkspaceAuditLog() {

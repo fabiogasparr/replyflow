@@ -30,6 +30,7 @@ describe("workspace role permissions", () => {
   it("limits members to conversations and reports", () => {
     expect(hasWorkspacePermission("MEMBER", "inbox:reply")).toBe(true);
     expect(hasWorkspacePermission("MEMBER", "reports:view")).toBe(true);
+    expect(hasWorkspacePermission("MEMBER", "reports:manage")).toBe(false);
     expect(canManageAutomations("MEMBER")).toBe(false);
     expect(canManageInstagram("MEMBER")).toBe(false);
     expect(canManageMembers("MEMBER")).toBe(false);

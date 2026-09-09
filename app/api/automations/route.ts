@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/client";
 import { calculateCtr, normalizeTopKeywords } from "@/lib/tracking/analytics";
 import { buildTrackedUrl } from "@/lib/tracking/message";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
-import { buildReportUrl, generateReportShareSlug } from "@/lib/reports/share";
+import { buildReportUrl } from "@/lib/reports/share";
 import { deriveAutomationOperationalState } from "@/lib/automations/operational-state";
 import {
   canManageAutomations,
@@ -108,7 +108,6 @@ const updateAutomationSchema = z.object({
   publicReplyMessages: z.array(z.string().max(1000)).max(10).optional(),
   isActive: z.boolean().optional(),
   wholeWordMatch: z.boolean().optional(),
-  reportShareEnabled: z.boolean().optional(),
   // Empty string clears the tracked link; a URL updates/creates it; undefined
   // leaves it unchanged.
   trackedDestinationUrl: z
@@ -161,22 +160,7 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
-  const automationsWithReports = await Promise.all(
-    automations.map(async (automation) => {
-      if (automation.reportShareSlug) return automation;
-
-      const updated = await prisma.automation.update({
-        where: { id: automation.id, workspaceId },
-        data: { reportShareSlug: generateReportShareSlug() },
-        select: { reportShareSlug: true },
-      });
-
-      return {
-        ...automation,
-        reportShareSlug: updated.reportShareSlug,
-      };
-    })
-  );
+  const automationsWithReports = automations;
 
   const [statusCounts, clickCounts, keywordCounts] = await Promise.all([
     prisma.dmLog.groupBy({
@@ -267,7 +251,7 @@ export async function GET(request: NextRequest) {
             ...link,
             trackedUrl: buildTrackedUrl(link.slug),
           })),
-          reportUrl: automation.reportShareSlug
+          reportUrl: automation.reportShareEnabled && automation.reportShareSlug
             ? buildReportUrl(automation.reportShareSlug)
             : null,
           analytics: {
@@ -435,7 +419,8 @@ export async function POST(request: NextRequest) {
       wholeWordMatch: parsed.data.wholeWordMatch,
       workspaceId,
       instagramAccountId: instagramAccount.id,
-      reportShareSlug: generateReportShareSlug(),
+      reportShareSlug: null,
+      reportShareEnabled: false,
       ...(linkCreates.length > 0
         ? { trackedLinks: { create: linkCreates } }
         : {}),

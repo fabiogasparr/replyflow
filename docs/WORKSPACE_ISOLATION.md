@@ -18,7 +18,7 @@ O ReplyFlow trata o workspace ativo como a fronteira de autorização para todos
 | Entrada | Chave de acesso | Limite de dados |
 | --- | --- | --- |
 | Aceite de convite | Token aleatório + mesmo e-mail autenticado | Workspace do convite |
-| Relatório compartilhado | `reportShareSlug` aleatório e habilitado | Uma automação e suas métricas |
+| Relatório compartilhado | `reportShareSlug` aleatório, publicado e revogável | Uma automação, marca e métricas agregadas do período |
 | Link rastreado | `slug` aleatório | Um destino e um evento de clique |
 | Webhook da Meta | Assinatura validada | Workspace derivado da conta oficial |
 

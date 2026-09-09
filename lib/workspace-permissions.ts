@@ -15,6 +15,7 @@ export type WorkspacePermission =
   | "contacts:manage"
   | "inbox:reply"
   | "reports:view"
+  | "reports:manage"
   | "billing:manage";
 
 const WORKSPACE_PERMISSIONS: Record<
@@ -30,6 +31,7 @@ const WORKSPACE_PERMISSIONS: Record<
     "contacts:manage",
     "inbox:reply",
     "reports:view",
+    "reports:manage",
     "billing:manage",
   ]),
   ADMIN: new Set([
@@ -40,6 +42,7 @@ const WORKSPACE_PERMISSIONS: Record<
     "contacts:manage",
     "inbox:reply",
     "reports:view",
+    "reports:manage",
   ]),
   MEMBER: new Set(["inbox:reply", "reports:view"]),
 };

@@ -95,6 +95,7 @@ describe("automation workspace isolation", () => {
     });
     expect(JSON.stringify(payload)).not.toContain("accessToken");
     expect(JSON.stringify(payload)).not.toContain("lastErrorMessage");
+    expect(prisma.automation.update).not.toHaveBeenCalled();
   });
 
   it("returns a client error for malformed JSON without touching the database", async () => {

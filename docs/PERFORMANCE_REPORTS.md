@@ -66,6 +66,8 @@ Rollback seguro:
 - remover índices é opcional e deve ser feito fora do horário de pico;
 - este módulo é somente leitura e não inicia o worker, não reprocessa jobs e não envia DMs.
 
-## Próxima evolução
+## Compartilhamento
 
-O relatório compartilhável existente continua independente e somente leitura. A próxima entrega de relatórios deve permitir marca do cliente, período compartilhado e revogação explícita do link. Conversão comercial depende primeiro da definição do evento de negócio e de sua política de atribuição.
+Proprietários e administradores podem publicar uma versão agregada por campanha com marca do cliente e período fixo de 7, 30 ou 90 dias. Links podem ser renovados ou revogados e não expõem dados pessoais. O contrato de autorização, privacidade, migration e rollback está em [Relatórios compartilháveis](SHARED_REPORTS.md).
+
+Conversão comercial depende primeiro da definição do evento de negócio e de sua política de atribuição.

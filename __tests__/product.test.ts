@@ -18,12 +18,14 @@ describe("ReplyFlow product configuration", () => {
     expect(new Set(routes).size).toBe(routes.length);
     expect(DASHBOARD_NAV_ITEMS.map((item) => item.label)).toContain("Automações");
     expect(DASHBOARD_NAV_ITEMS.map((item) => item.label)).toContain("Conversas");
+    expect(DASHBOARD_NAV_ITEMS.map((item) => item.label)).toContain("Relatórios");
   });
 
   it("resolves titles for nested routes", () => {
     expect(getDashboardPageTitle("/campaigns/new")).toBe("Nova automação");
     expect(getDashboardPageTitle("/campaigns/123/edit")).toBe("Automações");
     expect(getDashboardPageTitle("/inbox/thread-1")).toBe("Conversas");
+    expect(getDashboardPageTitle("/reports")).toBe("Relatórios de resultado");
     expect(getDashboardPageTitle("/admin/clientes")).toBe(
       "Administração da plataforma"
     );

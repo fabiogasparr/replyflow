@@ -23,6 +23,7 @@
     "test:billing-usage-db": "tsx scripts/test-billing-usage-db.ts",
     "test:platform-admin-db": "tsx scripts/test-platform-admin-db.ts",
     "test:platform-observability-db": "tsx scripts/test-platform-observability-db.ts",
+    "test:performance-reporting-db": "tsx scripts/test-performance-reporting-db.ts",
     "admin:role": "tsx scripts/set-platform-admin.ts"
   },
   "dependencies": {

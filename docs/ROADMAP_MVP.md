@@ -193,8 +193,8 @@ Progresso validado em 8 de setembro de 2026:
 
 Objetivo: dar visibilidade ao cliente e à operação do SaaS.
 
-- [ ] Consolidar envios, falhas, cliques, CTR e conversão por campanha.
-- [ ] Criar filtros por conta, workspace e período.
+- [ ] Consolidar envios, falhas, cliques, CTR e conversão por campanha. (Envios, falhas, cliques e CTR concluídos; conversão aguarda evento de negócio confiável.)
+- [x] Criar filtros por conta, workspace e período.
 - [ ] Criar relatórios compartilháveis com marca do cliente.
 - [x] Implementar painel global de clientes, planos e uso, inicialmente somente leitura.
 - [x] Exibir contas com tokens vencidos e workers indisponíveis.
@@ -215,6 +215,10 @@ Progresso validado em 8 de setembro de 2026:
 - Métricas de webhooks, DMs e eventos operacionais comparam janelas móveis de 1 hora, 24 horas e 7 dias ao período anterior equivalente e sinalizam anomalias.
 - Workspaces afetados são priorizados por contagens agregadas de incidentes; payloads, mensagens, jobs, tokens e erros internos permanecem fora da resposta.
 - Seis índices aditivos para consultas globais foram aprovados após as 30 migrations reais em schema descartável. Critérios, privacidade e rollback estão em `docs/PLATFORM_OBSERVABILITY.md`.
+- O painel autenticado de relatórios consolida envios, descartes, falhas, cliques, CTR e entrega por workspace, conta, automação e período, com comparação contra a janela anterior equivalente.
+- A seleção de workspace reutiliza o contexto persistido; conta e automação são revalidadas antes das métricas e repetidas em todas as agregações para impedir leitura cruzada.
+- A série diária é agregada em uma única consulta, períodos vazios são preenchidos com zero e cinco índices compostos foram aprovados após as 31 migrations reais em schema descartável.
+- O CSV contém somente dados agregados, desativa fórmulas de planilha e não permite cache. Conversão em venda permanece indisponível até existir um evento comercial real; detalhes e rollback estão em `docs/PERFORMANCE_REPORTS.md`.
 
 ## Marco 7 — Expansões posteriores ao MVP
 

@@ -9,6 +9,7 @@ export const PRODUCT = {
 export type DashboardNavKey =
   | "dashboard"
   | "overview"
+  | "reports"
   | "inbox"
   | "contacts"
   | "campaigns"
@@ -24,6 +25,7 @@ export const DASHBOARD_NAV_ITEMS: ReadonlyArray<{
 }> = [
   { key: "dashboard", label: "Início", href: "/dashboard" },
   { key: "overview", label: "Desempenho", href: "/overview" },
+  { key: "reports", label: "Relatórios", href: "/reports" },
   { key: "inbox", label: "Conversas", href: "/inbox" },
   { key: "contacts", label: "Contatos", href: "/contacts" },
   { key: "campaigns", label: "Automações", href: "/campaigns" },
@@ -49,6 +51,7 @@ const dashboardPageTitles: ReadonlyArray<[prefix: string, title: string]> = [
   ["/campaigns", "Automações"],
   ["/automations", "Automações"],
   ["/overview", "Desempenho"],
+  ["/reports", "Relatórios de resultado"],
   ["/inbox", "Conversas"],
   ["/contacts", "Contatos"],
   ["/logs", "Histórico de envios"],

@@ -448,6 +448,9 @@ model DmLog {
   @@unique([automationId, commentId])
   @@index([workspaceId, instagramAccountId, commenterId, createdAt], map: "DmLog_contact_createdAt_idx")
   @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, instagramAccountId, createdAt])
+  @@index([workspaceId, automationId, createdAt])
   @@index([automationId])
   @@index([instagramAccountId])
   @@index([status])
@@ -510,6 +513,8 @@ model LinkClick {
   @@index([trackedLinkId])
   @@index([createdAt])
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, instagramAccountId, createdAt])
+  @@index([workspaceId, automationId, createdAt])
 }
 
 model WebhookEvent {

@@ -27,7 +27,8 @@ export type DmRetryCandidate = {
   manualRetryCount: number;
   lastManualRetryAt: Date | null;
   automation: { isActive: boolean };
-  instagramAccount: { instagramId: string };
+  instagramAccount: { instagramId: string; tokenExpiresAt?: Date | null };
+  workspace?: { archivedAt: Date | null };
 };
 
 export type DmRetryEligibility =
@@ -44,6 +45,12 @@ export function getDmRetryEligibility(
   log: DmRetryCandidate,
   now = new Date()
 ): DmRetryEligibility {
+  if (log.workspace?.archivedAt) {
+    return {
+      allowed: false,
+      reason: "A empresa está arquivada e não pode processar novos envios.",
+    };
+  }
   if (!RETRYABLE_STATUSES.has(log.status)) {
     return {
       allowed: false,
@@ -64,6 +71,15 @@ export function getDmRetryEligibility(
       allowed: false,
       reason:
         "A entrega já foi iniciada na Meta. O reenvio foi bloqueado para evitar uma mensagem duplicada.",
+    };
+  }
+  if (
+    log.instagramAccount.tokenExpiresAt &&
+    log.instagramAccount.tokenExpiresAt.getTime() <= now.getTime()
+  ) {
+    return {
+      allowed: false,
+      reason: "Reconecte a conta do Instagram antes de reprocessar este envio.",
     };
   }
   if (

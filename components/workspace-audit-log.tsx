@@ -32,6 +32,8 @@ const actionLabels: Record<string, string> = {
   CONTACT_UPDATED: "atualizou um contato",
   CONVERSATION_UPDATED: "organizou uma conversa",
   CONVERSATION_MESSAGE_SENT: "respondeu uma conversa",
+  DM_RETRY_REQUESTED: "solicitou o reprocessamento de um envio",
+  SUPPORT_DM_RETRY_REQUESTED: "reprocessou um envio pela central de suporte",
   REPORT_BRAND_UPDATED: "atualizou a marca dos relatórios",
   REPORT_PUBLISHED: "publicou um relatório de campanha",
   REPORT_REVOKED: "revogou um relatório de campanha",

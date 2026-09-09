@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import PlatformOverview from "@/components/platform-overview";
 import PlatformOperations from "@/components/platform-operations";
+import PlatformSupport from "@/components/platform-support";
 import { getPlatformAccess } from "@/lib/platform-admin";
 
 export default async function PlatformAdminPage() {
@@ -18,11 +19,12 @@ export default async function PlatformAdminPage() {
           Administração da plataforma
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Visão global somente leitura{adminName ? ` para ${adminName}` : ""}.
-          Nenhuma ação altera clientes ou planos.
+          Visão global e recuperação controlada{adminName ? ` para ${adminName}` : ""}.
+          Sem impersonação, acesso a mensagens ou alterações de planos.
         </p>
       </div>
       <PlatformOperations />
+      <PlatformSupport />
       <PlatformOverview adminName={adminName} showHeader={false} />
     </div>
   );

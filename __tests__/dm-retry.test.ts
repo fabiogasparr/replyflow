@@ -130,6 +130,33 @@ describe("DM retry eligibility", () => {
         "A publicação de origem não está disponível para este registro antigo.",
     });
   });
+
+  it("blocks archived workspaces and expired Instagram credentials", () => {
+    expect(
+      getDmRetryEligibility({
+        ...candidate,
+        workspace: { archivedAt: new Date("2026-09-01T00:00:00.000Z") },
+      })
+    ).toEqual({
+      allowed: false,
+      reason: "A empresa está arquivada e não pode processar novos envios.",
+    });
+    expect(
+      getDmRetryEligibility(
+        {
+          ...candidate,
+          instagramAccount: {
+            ...candidate.instagramAccount,
+            tokenExpiresAt: new Date("2026-09-08T00:00:00.000Z"),
+          },
+        },
+        new Date("2026-09-09T00:00:00.000Z")
+      )
+    ).toEqual({
+      allowed: false,
+      reason: "Reconecte a conta do Instagram antes de reprocessar este envio.",
+    });
+  });
 });
 
 describe("POST /api/logs/:id/retry", () => {
@@ -154,12 +181,16 @@ describe("POST /api/logs/:id/retry", () => {
       where: {
         id: "foreign_log",
         workspaceId: "workspace_1",
+        workspace: { id: "workspace_1", archivedAt: null },
         automation: { workspaceId: "workspace_1" },
         instagramAccount: { workspaceId: "workspace_1" },
       },
       include: {
+        workspace: { select: { archivedAt: true } },
         automation: { select: { isActive: true } },
-        instagramAccount: { select: { instagramId: true } },
+        instagramAccount: {
+          select: { instagramId: true, tokenExpiresAt: true },
+        },
       },
     });
   });
@@ -203,7 +234,11 @@ describe("POST /api/logs/:id/retry", () => {
         actorUserId: "user_1",
         action: "DM_RETRY_REQUESTED",
         targetId: "log_1",
-        metadata: { triggerType: "COMMENT", retryNumber: 1 },
+        metadata: {
+          triggerType: "COMMENT",
+          retryNumber: 1,
+          requestedVia: "WORKSPACE",
+        },
       }),
     });
   });

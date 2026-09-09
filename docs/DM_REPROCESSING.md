@@ -11,6 +11,7 @@ Por isso, `deliveryAttemptedAt` é a fronteira de segurança:
 - `FAILED`, `SKIPPED_RATE_LIMIT` e `SKIPPED_PLAN_LIMIT` podem ser reprocessados somente quando `deliveryAttemptedAt` é nulo;
 - uma falha com `deliveryAttemptedAt` preenchido continua visível para diagnóstico, mas não oferece reenvio;
 - `SENT`, `PENDING`, deduplicações e interações de botão não podem ser reprocessados;
+- a empresa precisa estar ativa e o token da conta do Instagram não pode estar vencido;
 - uma automação pausada precisa ser reativada;
 - há intervalo mínimo de um minuto entre solicitações para o mesmo log.
 
@@ -46,6 +47,8 @@ A fila é o resultado principal. Se somente a gravação de auditoria falhar dep
 ## Operação e diagnóstico
 
 Na tela **Envios**, o operador vê a origem, status, erro, número de reprocessamentos e o botão de ação. Quando o botão está bloqueado, seu texto auxiliar informa o motivo.
+
+Administradores globais também possuem uma fila sanitizada em `/admin`. Ela não mostra contatos ou conteúdo e adiciona confirmação digitada, empresa ativa, token válido e heartbeat do worker às mesmas regras. O contrato completo está em `docs/PLATFORM_SUPPORT.md`.
 
 Antes de reprocessar:
 

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@/app/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
-import { contactFiltersSchema, contactSummarySelect } from "@/lib/contacts";
+import { contactSummarySelect } from "@/lib/contacts";
+import {
+  buildContactSegmentQueries,
+  contactSegmentFiltersSchema,
+} from "@/lib/contact-segments";
 import { getCurrentWorkspaceContext } from "@/lib/workspace-access";
 import { canManageContacts } from "@/lib/workspace-permissions";
 
@@ -15,12 +18,16 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
-  const parsed = contactFiltersSchema.safeParse({
+  const parsed = contactSegmentFiltersSchema.safeParse({
     page: params.get("page") ?? undefined,
     pageSize: params.get("pageSize") ?? undefined,
     search: params.get("q") ?? params.get("search") ?? undefined,
     instagramAccountId: params.get("instagramAccountId") ?? undefined,
     tag: params.get("tag") ?? undefined,
+    automationId: params.get("automationId") ?? undefined,
+    origin: params.get("origin") ?? undefined,
+    engagement: params.get("engagement") ?? undefined,
+    activeWithinDays: params.get("activeWithinDays") ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -29,38 +36,55 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { page, pageSize, search, instagramAccountId, tag } = parsed.data;
-  const where: Prisma.ContactWhereInput = {
+  const filters = parsed.data;
+  const queries = buildContactSegmentQueries({
     workspaceId: context.workspaceId,
-    instagramAccount: { workspaceId: context.workspaceId },
-    ...(instagramAccountId && instagramAccountId !== "all" ? { instagramAccountId } : {}),
-    ...(tag ? { tags: { has: tag } } : {}),
-    ...(search ? {
-      OR: [
-        { username: { contains: search.replace(/^@/, ""), mode: "insensitive" } },
-        { instagramScopedId: { contains: search } },
-      ],
-    } : {}),
-  };
-
-  const [contacts, total, accounts] = await Promise.all([
-    prisma.contact.findMany({
-      where,
-      select: contactSummarySelect,
-      orderBy: [{ lastSeenAt: "desc" }, { id: "desc" }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    prisma.contact.count({ where }),
+    filters,
+  });
+  const [idRows, totalRows, accounts, automations] = await Promise.all([
+    prisma.$queryRaw<Array<{ id: string }>>(queries.ids),
+    prisma.$queryRaw<Array<{ total: number }>>(queries.total),
     prisma.instagramAccount.findMany({
       where: { workspaceId: context.workspaceId },
       select: { id: true, username: true },
       orderBy: [{ username: "asc" }, { id: "asc" }],
     }),
+    prisma.automation.findMany({
+      where: { workspaceId: context.workspaceId },
+      select: { id: true, name: true, instagramAccountId: true },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    }),
   ]);
+  const ids = idRows.map((row) => row.id);
+  const unorderedContacts = ids.length
+    ? await prisma.contact.findMany({
+        where: {
+          id: { in: ids },
+          workspaceId: context.workspaceId,
+          instagramAccount: { workspaceId: context.workspaceId },
+        },
+        select: contactSummarySelect,
+      })
+    : [];
+  const order = new Map(ids.map((id, index) => [id, index]));
+  const contacts = unorderedContacts.sort(
+    (left, right) =>
+      (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0)
+  );
 
-  return NextResponse.json({
-    success: true,
-    data: { contacts, total, page, pageSize, accounts, canEdit: canManageContacts(context.role) },
-  });
+  return NextResponse.json(
+    {
+      success: true,
+      data: {
+        contacts,
+        total: totalRows[0]?.total ?? 0,
+        page: filters.page,
+        pageSize: filters.pageSize,
+        accounts,
+        automations,
+        canEdit: canManageContacts(context.role),
+      },
+    },
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
 }

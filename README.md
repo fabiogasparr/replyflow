@@ -44,6 +44,7 @@ OpenReply is built around Meta's official Instagram private replies. It does not
 - Campaign templates. Start from a preset instead of a blank form.
 - Visual conversation map. See triggers, public and private branches, follow checks, tracked delivery, and follow-ups; drag the canonical stages and persist the shared layout safely by revision.
 - Inbox. Read your Instagram DM conversations and reply from the dashboard, inside Meta's 24-hour messaging window. Cached so it loads instantly on repeat visits.
+- Dynamic contact segments. Combine account, tag, campaign, interaction source, delivery outcome, and activity window in a shareable authenticated view.
 - DM logs. Every send, skip, and failure is logged with a reason.
 - Safe recovery. Owners and admins can reprocess pre-delivery failures without replaying ambiguous Meta sends; platform support has a sanitized, audited, single-item recovery desk without impersonation.
 - Campaign health. Clear active, paused, waiting-for-publication and error states show when an operator needs to act.

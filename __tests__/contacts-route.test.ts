@@ -6,7 +6,9 @@ const { getCurrentWorkspaceContext, mockPrisma, transaction } = vi.hoisted(() =>
   mockPrisma: {
     contact: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
     instagramAccount: { findMany: vi.fn() },
+    automation: { findMany: vi.fn() },
     dmLog: { findMany: vi.fn(), count: vi.fn() },
+    $queryRaw: vi.fn(),
     $transaction: vi.fn(),
   },
   transaction: {
@@ -62,6 +64,10 @@ beforeEach(() => {
   mockPrisma.contact.count.mockResolvedValue(0);
   mockPrisma.contact.findFirst.mockResolvedValue(contact);
   mockPrisma.instagramAccount.findMany.mockResolvedValue([]);
+  mockPrisma.automation.findMany.mockResolvedValue([]);
+  mockPrisma.$queryRaw
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([{ total: 0 }]);
   mockPrisma.dmLog.findMany.mockResolvedValue([]);
   mockPrisma.dmLog.count.mockResolvedValue(0);
   transaction.contact.updateMany.mockResolvedValue({ count: 1 });
@@ -97,47 +103,44 @@ describe("contacts authorization and scoped reads", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
-      data: { contacts: [], total: 0, page: 1, pageSize: 25, accounts: [], canEdit: false },
+      data: { contacts: [], total: 0, page: 1, pageSize: 25, accounts: [], automations: [], canEdit: false },
     });
-    expect(mockPrisma.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { workspaceId: "workspace_1", instagramAccount: { workspaceId: "workspace_1" } },
-      take: 25,
-      skip: 0,
-    }));
-    const select = mockPrisma.contact.findMany.mock.calls[0][0].select;
-    expect(select).not.toHaveProperty("notes");
-    expect(select.instagramAccount).toEqual({ select: { id: true, username: true } });
+    expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
     expect(mockPrisma.instagramAccount.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { workspaceId: "workspace_1" },
       select: { id: true, username: true },
     }));
+    expect(mockPrisma.automation.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { workspaceId: "workspace_1" },
+      select: { id: true, name: true, instagramAccountId: true },
+    }));
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
-  it("combines search, account and tag filters within the active workspace", async () => {
-    const response = await listContacts(request("?q=%40MARIA&instagramAccountId=account_2&tag=%20Cliente%20&page=2&pageSize=10"));
+  it("combines identity and activity filters as parameterized SQL", async () => {
+    const response = await listContacts(request("?q=%40MARIA&instagramAccountId=account_2&tag=%20Cliente%20&automationId=automation_2&origin=COMMENT&engagement=SENT&activeWithinDays=30&page=2&pageSize=10"));
 
     expect(response.status).toBe(200);
-    const where = {
-      workspaceId: "workspace_1",
-      instagramAccount: { workspaceId: "workspace_1" },
-      instagramAccountId: "account_2",
-      tags: { has: "Cliente" },
-      OR: [
-        { username: { contains: "MARIA", mode: "insensitive" } },
-        { instagramScopedId: { contains: "@MARIA" } },
-      ],
-    };
-    expect(mockPrisma.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 10, take: 10 }));
-    expect(mockPrisma.contact.count).toHaveBeenCalledWith({ where });
+    const queries = mockPrisma.$queryRaw.mock.calls.map(([query]) => query);
+    const sql = queries.map((query) => query.strings.join("?")).join("\n");
+    const values = queries.flatMap((query) => query.values);
+    expect(sql).toContain("EXISTS");
+    expect(sql).toContain('log."triggerType"::text');
+    expect(sql).toContain('log."status"::text');
+    expect(values).toEqual(expect.arrayContaining([
+      "workspace_1", "account_2", "Cliente", "MARIA", "@MARIA",
+      "automation_2", "COMMENT", "SENT", 10,
+    ]));
+    expect(sql).not.toContain("automation_2");
   });
 
   it("accepts search as an alias and all accounts without removing workspace scope", async () => {
     await listContacts(request("?search=maria&instagramAccountId=all"));
 
-    const where = mockPrisma.contact.findMany.mock.calls[0][0].where;
-    expect(where.workspaceId).toBe("workspace_1");
-    expect(where).not.toHaveProperty("instagramAccountId");
-    expect(where.OR[0]).toEqual({ username: { contains: "maria", mode: "insensitive" } });
+    const query = mockPrisma.$queryRaw.mock.calls[0][0];
+    expect(query.values).toContain("workspace_1");
+    expect(query.values).toContain("maria");
+    expect(query.values).not.toContain("all");
   });
 
   it.each(["page=0", "page=NaN", "page=1.5", "pageSize=101", "pageSize=-1", "page=1000001"])(
@@ -145,9 +148,43 @@ describe("contacts authorization and scoped reads", () => {
     async (query) => {
       const response = await listContacts(request(`?${query}`));
       expect(response.status).toBe(400);
-      expect(mockPrisma.contact.findMany).not.toHaveBeenCalled();
+      expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    "origin=POSTBACK",
+    "engagement=UNKNOWN",
+    "activeWithinDays=14",
+    "activeWithinDays=-7",
+  ])("rejects unsupported segment values: %s", async (query) => {
+    const response = await listContacts(request(`?${query}`));
+    expect(response.status).toBe(400);
+    expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("loads selected contacts with a second explicit workspace boundary", async () => {
+    mockPrisma.$queryRaw.mockReset();
+    mockPrisma.$queryRaw
+      .mockResolvedValueOnce([{ id: "contact_1" }])
+      .mockResolvedValueOnce([{ total: 1 }]);
+    mockPrisma.contact.findMany.mockResolvedValue([{ ...contact, notes: undefined }]);
+
+    const response = await listContacts(request("?origin=MESSAGE"));
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.contact.findMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["contact_1"] },
+        workspaceId: "workspace_1",
+        instagramAccount: { workspaceId: "workspace_1" },
+      },
+      select: expect.not.objectContaining({ notes: true }),
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      data: { total: 1, contacts: [{ id: "contact_1" }] },
+    });
+  });
 
   it("returns detail and edit capability to an admin with an explicit safe select", async () => {
     getCurrentWorkspaceContext.mockResolvedValue(context("ADMIN"));

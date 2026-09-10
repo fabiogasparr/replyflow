@@ -40,6 +40,7 @@ export type ContactsListData = {
   page: number;
   pageSize: number;
   accounts: ContactAccount[];
+  automations: Array<{ id: string; name: string; instagramAccountId: string }>;
   canEdit: boolean;
 };
 

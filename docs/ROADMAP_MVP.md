@@ -136,14 +136,14 @@ Objetivo: transformar interações isoladas em relacionamento persistente.
 - [x] Migrar ou associar logs existentes aos contatos.
 - [ ] Criar perfil do contato com histórico de comentários, DMs e cliques. (Comentários e respostas de automação concluídos; cliques aguardam identificação do destinatário.)
 - [ ] Permitir tags manuais e automáticas. (Etiquetas manuais concluídas.)
-- [ ] Criar segmentos por origem, campanha, engajamento e data.
+- [x] Criar segmentos por origem, campanha, engajamento e data.
 - [x] Evoluir o inbox com atribuição, status, busca e notas.
 - [ ] Aplicar a janela de mensagens da Meta na interface. (Estimativa e aviso concluídos; regras especiais ainda dependem da resposta oficial da Meta.)
 - [ ] Implementar exportação e exclusão de dados pessoais.
 
 Critério de saída: a equipe consegue identificar um contato, acompanhar seu histórico e responder com contexto.
 
-Progresso validado em 5 de setembro de 2026:
+Progresso validado em 5 e 10 de setembro de 2026:
 
 - Perfis de contato são projetados automaticamente dos logs existentes e dos novos eventos, sem alterar o fluxo oficial da Meta.
 - A identidade composta por workspace, conta do Instagram e usuário impede colisões entre empresas e contas.
@@ -158,6 +158,10 @@ Progresso validado em 5 de setembro de 2026:
 - Mensagens completas permanecem na Meta; o PostgreSQL guarda somente a prévia mais recente e o estado de trabalho da equipe.
 - O isolamento de conversa, contato, conta e responsável foi validado após as 24 migrations reais em schema descartável.
 - Impacto, estratégia de falha e rollback estão documentados em `docs/CONVERSATIONS.md`.
+- A lista de contatos oferece segmentos dinâmicos por conta, etiqueta, campanha, origem, resultado da entrega e período de atividade.
+- O recorte fica na URL e pode ser compartilhado sem conceder acesso; autenticação e workspace continuam obrigatórios para abrir os dados.
+- Campanha, origem e resultado são correlacionados na mesma interação com SQL parametrizado e quatro limites explícitos de isolamento.
+- Nenhuma projeção duplicada ou migration foi necessária; modelo, desempenho, privacidade e rollback estão documentados em `docs/CONTACT_SEGMENTS.md`.
 
 ## Marco 5 — Planos e cobrança
 

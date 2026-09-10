@@ -7,12 +7,38 @@ import type {
   AutomationFlowNodeId,
   AutomationFlowNodeKind,
 } from "@/lib/automations/flow-map";
+import {
+  FLOW_CANVAS_HEIGHT,
+  FLOW_CANVAS_WIDTH,
+  type FlowDefinitionV1,
+  type FlowLayoutNode,
+} from "@/lib/automations/flow-definition";
+
+type LayoutState =
+  | "idle"
+  | "loading"
+  | "dirty"
+  | "saving"
+  | "saved"
+  | "error"
+  | "conflict";
 
 interface AutomationFlowMapProps {
   flow: AutomationFlowMapData;
+  layout: FlowDefinitionV1;
+  layoutState: LayoutState;
+  layoutMessage: string | null;
+  isExisting: boolean;
+  canPersist: boolean;
+  onLayoutChange: (layout: FlowDefinitionV1) => void;
+  onSaveLayout: () => void;
   onToggleNode: (nodeId: AutomationFlowNodeId) => void;
   onEditNode: (nodeId: AutomationFlowNodeId) => void;
 }
+
+const CARD_WIDTH = 196;
+const CARD_HEIGHT = 180;
+const POSITION_STEP = 20;
 
 const kindMeta: Record<
   AutomationFlowNodeKind,
@@ -40,6 +66,14 @@ const kindMeta: Record<
   },
 };
 
+function clampPosition(node: FlowLayoutNode): FlowLayoutNode {
+  return {
+    ...node,
+    x: Math.max(0, Math.min(FLOW_CANVAS_WIDTH - CARD_WIDTH, Math.round(node.x))),
+    y: Math.max(0, Math.min(FLOW_CANVAS_HEIGHT - CARD_HEIGHT, Math.round(node.y))),
+  };
+}
+
 function FlowIcon({ node }: { node: AutomationFlowNode }) {
   const meta = kindMeta[node.kind];
   return (
@@ -59,6 +93,7 @@ function FlowIcon({ node }: { node: AutomationFlowNode }) {
     </span>
   );
 }
+
 function FlowNodeCard({
   node,
   selected,
@@ -74,12 +109,12 @@ function FlowNodeCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`group relative w-[196px] shrink-0 rounded-2xl border p-3.5 text-left shadow-[0_10px_30px_rgba(17,38,32,0.06)] transition duration-200 ${
+      className={`group relative h-[180px] w-[196px] rounded-2xl border p-3.5 text-left shadow-[0_10px_30px_rgba(17,38,32,0.06)] transition duration-200 ${
         selected
-          ? "-translate-y-1 border-[#112620] bg-white shadow-[0_16px_34px_rgba(17,38,32,0.14)]"
+          ? "border-[#112620] bg-white shadow-[0_16px_34px_rgba(17,38,32,0.14)]"
           : node.enabled
-            ? "border-[#d5cbbb] bg-[#fffdf8] hover:-translate-y-0.5 hover:border-[#9d9180]"
-            : "border-dashed border-[#cfc6b8] bg-[#f3eee4]/80 opacity-75 hover:opacity-100"
+            ? "border-[#d5cbbb] bg-[#fffdf8] hover:border-[#9d9180]"
+            : "border-dashed border-[#cfc6b8] bg-[#f3eee4]/90 opacity-75 hover:opacity-100"
       }`}
     >
       <span
@@ -104,43 +139,92 @@ function FlowNodeCard({
         {node.eyebrow}
       </span>
       <span className="mt-1 block text-sm font-bold text-[#112620]">{node.title}</span>
-      <span className="mt-2 block min-h-12 text-[11px] leading-[1.45] text-[#66736e]">
+      <span className="mt-2 line-clamp-3 block text-[11px] leading-[1.45] text-[#66736e]">
         {node.summary}
       </span>
     </button>
   );
 }
 
-function Connector({ label }: { label: string }) {
-  return (
-    <div className="flex w-16 shrink-0 flex-col items-center justify-center" aria-hidden="true">
-      <span className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#8c857a]">
-        {label}
-      </span>
-      <span className="flex w-full items-center">
-        <span className="h-px flex-1 bg-[#bdb3a4]" />
-        <span className="-ml-1 h-2 w-2 rotate-45 border-r border-t border-[#7d7467]" />
-      </span>
-    </div>
-  );
+function connectionPath(from: FlowLayoutNode, to: FlowLayoutNode, side: boolean) {
+  if (side) {
+    const startX = from.x + CARD_WIDTH / 2;
+    const startY = from.y + CARD_HEIGHT;
+    const endX = to.x + CARD_WIDTH / 2;
+    const endY = to.y;
+    const middleY = (startY + endY) / 2;
+    return {
+      d: `M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`,
+      labelX: (startX + endX) / 2 + 6,
+      labelY: middleY - 7,
+    };
+  }
+
+  const startX = from.x + CARD_WIDTH;
+  const startY = from.y + CARD_HEIGHT / 2;
+  const endX = to.x;
+  const endY = to.y + CARD_HEIGHT / 2;
+  const middleX = (startX + endX) / 2;
+  return {
+    d: `M ${startX} ${startY} C ${middleX} ${startY}, ${middleX} ${endY}, ${endX} ${endY}`,
+    labelX: middleX,
+    labelY: (startY + endY) / 2 - 9,
+  };
 }
 
 export default function AutomationFlowMap({
   flow,
+  layout,
+  layoutState,
+  layoutMessage,
+  isExisting,
+  canPersist,
+  onLayoutChange,
+  onSaveLayout,
   onToggleNode,
   onEditNode,
 }: AutomationFlowMapProps) {
   const [selectedId, setSelectedId] =
     useState<AutomationFlowNodeId>("trigger");
+  const [drag, setDrag] = useState<{
+    id: AutomationFlowNodeId;
+    pointerX: number;
+    pointerY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
   const nodeById = useMemo(
     () => new Map(flow.nodes.map((node) => [node.id, node])),
     [flow.nodes]
   );
+  const positionById = useMemo(
+    () => new Map(layout.nodes.map((node) => [node.id, node])),
+    [layout.nodes]
+  );
   const selected = nodeById.get(selectedId) ?? flow.nodes[0];
-  const mainNodes = ["trigger", "opening-dm", "follow-gate", "delivery", "follow-up"]
-    .map((id) => nodeById.get(id as AutomationFlowNodeId))
-    .filter((node): node is AutomationFlowNode => Boolean(node));
-  const publicReply = nodeById.get("public-reply");
+  const selectedPosition = selected ? positionById.get(selected.id) : undefined;
+
+  function changeNodePosition(id: AutomationFlowNodeId, x: number, y: number) {
+    const next = clampPosition({ id, x, y });
+    onLayoutChange({
+      ...layout,
+      nodes: layout.nodes.map((node) => (node.id === id ? next : node)),
+    });
+  }
+
+  function nudgeSelected(deltaX: number, deltaY: number) {
+    if (!selected || !selectedPosition) return;
+    changeNodePosition(
+      selected.id,
+      selectedPosition.x + deltaX,
+      selectedPosition.y + deltaY
+    );
+  }
+
+  const canSave =
+    canPersist && (layoutState === "dirty" || layoutState === "error");
+
+  if (!selected) return null;
 
   return (
     <section
@@ -150,67 +234,141 @@ export default function AutomationFlowMap({
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#d0c6b7] bg-[#112620] px-5 py-4 text-white sm:px-6">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#f5c451]">
-            Arquitetura da conversa
+            Arquitetura da conversa · V1
           </p>
           <h2 className="mt-1 font-display text-xl">Do primeiro sinal à próxima ação.</h2>
         </div>
-        <div className="flex items-center gap-4 text-[11px] text-[#b8c7c1]">
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#b8c7c1]">
           <span>
             <strong className="text-white">{flow.configuredSteps}</strong> de {flow.activeSteps} etapas prontas
           </span>
-          <span className="h-4 w-px bg-white/15" />
+          <span className="hidden h-4 w-px bg-white/15 sm:block" />
           <span className="flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${flow.warnings.length ? "bg-[#f5c451]" : "bg-[#6ed1a9]"}`} />
             {flow.warnings.length ? `${flow.warnings.length} pendência${flow.warnings.length > 1 ? "s" : ""}` : "Fluxo consistente"}
           </span>
+          {canPersist ? (
+            <button
+              type="button"
+              onClick={onSaveLayout}
+              disabled={!canSave}
+              className="ml-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2 font-bold text-white transition hover:bg-white/15 disabled:cursor-default disabled:opacity-45"
+            >
+              {layoutState === "saving" ? "Salvando…" : "Salvar organização"}
+            </button>
+          ) : (
+            <span className="rounded-lg border border-white/10 px-3 py-2 text-[#9eb2aa]">
+              {isExisting
+                ? "Somente admins organizam"
+                : "Organização disponível após criar"}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="grid min-h-[520px] lg:grid-cols-[minmax(0,1fr)_290px]">
+      <div className="grid min-h-[580px] lg:grid-cols-[minmax(0,1fr)_290px]">
         <div className="brand-grid overflow-x-auto border-b border-[#d0c6b7] bg-[#f7f2e9] lg:border-b-0 lg:border-r">
-          <div className="min-w-[1120px] px-8 py-12">
-            <div className="flex items-center">
-              {mainNodes.map((node, index) => (
-                <div key={node.id} className="flex items-center">
-                  {index > 0 && (
-                    <Connector
-                      label={
-                        node.id === "delivery" && nodeById.get("follow-gate")?.enabled
-                          ? "se sim"
-                          : node.id === "follow-up"
-                            ? "depois"
-                            : "continuar"
-                      }
+          <div
+            className="relative"
+            style={{ width: FLOW_CANVAS_WIDTH, height: FLOW_CANVAS_HEIGHT }}
+          >
+            <svg
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+              viewBox={`0 0 ${FLOW_CANVAS_WIDTH} ${FLOW_CANVAS_HEIGHT}`}
+            >
+              <defs>
+                <marker
+                  id="flow-arrow"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#8f8577" />
+                </marker>
+              </defs>
+              {layout.edges.map((edge) => {
+                const from = positionById.get(edge.from);
+                const to = positionById.get(edge.to);
+                if (!from || !to) return null;
+                const path = connectionPath(from, to, edge.branch === "side");
+                return (
+                  <g key={`${edge.from}:${edge.to}`}>
+                    <path
+                      d={path.d}
+                      fill="none"
+                      stroke={edge.branch === "side" ? "#b87913" : "#8f8577"}
+                      strokeDasharray={edge.branch === "side" ? "5 5" : undefined}
+                      strokeWidth="1.4"
+                      markerEnd="url(#flow-arrow)"
                     />
-                  )}
+                    <text
+                      x={path.labelX}
+                      y={path.labelY}
+                      textAnchor="middle"
+                      className="fill-[#766d61] text-[9px] font-bold uppercase tracking-[0.12em]"
+                    >
+                      {edge.label}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+
+            {flow.nodes.map((node) => {
+              const position = positionById.get(node.id);
+              if (!position) return null;
+              return (
+                <div
+                  key={node.id}
+                  className="absolute touch-none"
+                  style={{ left: position.x, top: position.y }}
+                >
+                  <button
+                    type="button"
+                    aria-label={`Mover etapa ${node.title}`}
+                    title="Arraste para organizar"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      setSelectedId(node.id);
+                      setDrag({
+                        id: node.id,
+                        pointerX: event.clientX,
+                        pointerY: event.clientY,
+                        originX: position.x,
+                        originY: position.y,
+                      });
+                    }}
+                    onPointerMove={(event) => {
+                      if (!drag || drag.id !== node.id) return;
+                      changeNodePosition(
+                        node.id,
+                        drag.originX + event.clientX - drag.pointerX,
+                        drag.originY + event.clientY - drag.pointerY
+                      );
+                    }}
+                    onPointerUp={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                        event.currentTarget.releasePointerCapture(event.pointerId);
+                      }
+                      setDrag(null);
+                    }}
+                    className="absolute -top-3 left-1/2 z-10 flex h-6 -translate-x-1/2 cursor-grab items-center gap-0.5 rounded-full border border-[#cec3b3] bg-[#fffdf8] px-2 text-[#887d70] shadow-sm active:cursor-grabbing"
+                  >
+                    <span aria-hidden="true">•••</span>
+                  </button>
                   <FlowNodeCard
                     node={node}
                     selected={selected.id === node.id}
                     onSelect={() => setSelectedId(node.id)}
                   />
                 </div>
-              ))}
-            </div>
-
-            {publicReply && (
-              <div className="ml-[34px] mt-1 flex items-start">
-                <div className="ml-[62px] flex w-[100px] flex-col items-center" aria-hidden="true">
-                  <span className="h-8 w-px bg-[#bdb3a4]" />
-                  <span className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#8c857a]">
-                    no post
-                  </span>
-                  <span className="h-5 w-px bg-[#bdb3a4]" />
-                  <span className="-mt-1 h-2 w-2 rotate-[135deg] border-r border-t border-[#7d7467]" />
-                </div>
-                <div className="-ml-[148px] mt-[58px]">
-                  <FlowNodeCard
-                    node={publicReply}
-                    selected={selected.id === publicReply.id}
-                    onSelect={() => setSelectedId(publicReply.id)}
-                  />
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </div>
 
@@ -251,6 +409,26 @@ export default function AutomationFlowMap({
             </p>
           </div>
 
+          <div className="mt-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+              Posição no mapa
+            </p>
+            <div className="mt-2 grid grid-cols-3 gap-1.5" aria-label="Mover etapa selecionada">
+              <span />
+              <button type="button" onClick={() => nudgeSelected(0, -POSITION_STEP)} className="rounded-lg border border-border bg-white py-1.5 text-sm hover:bg-surface" aria-label="Mover etapa para cima">↑</button>
+              <span />
+              <button type="button" onClick={() => nudgeSelected(-POSITION_STEP, 0)} className="rounded-lg border border-border bg-white py-1.5 text-sm hover:bg-surface" aria-label="Mover etapa para a esquerda">←</button>
+              <span className="grid place-items-center text-[9px] font-bold text-muted">20 px</span>
+              <button type="button" onClick={() => nudgeSelected(POSITION_STEP, 0)} className="rounded-lg border border-border bg-white py-1.5 text-sm hover:bg-surface" aria-label="Mover etapa para a direita">→</button>
+              <span />
+              <button type="button" onClick={() => nudgeSelected(0, POSITION_STEP)} className="rounded-lg border border-border bg-white py-1.5 text-sm hover:bg-surface" aria-label="Mover etapa para baixo">↓</button>
+              <span />
+            </div>
+            <p className="mt-2 text-[10px] leading-4 text-muted">
+              Arraste pelo puxador do cartão ou use os controles acima.
+            </p>
+          </div>
+
           <div className="mt-6 space-y-2.5">
             <button
               type="button"
@@ -270,12 +448,24 @@ export default function AutomationFlowMap({
             )}
           </div>
 
+          {(layoutMessage || layoutState === "loading") && (
+            <div
+              className={`mt-5 rounded-xl border px-3 py-2.5 text-[11px] leading-5 ${
+                layoutState === "error" || layoutState === "conflict"
+                  ? "border-warning/25 bg-warning/5 text-warning"
+                  : "border-border bg-surface/60 text-muted"
+              }`}
+            >
+              {layoutState === "loading" ? "Carregando organização compartilhada…" : layoutMessage}
+            </div>
+          )}
+
           <div className="mt-7 border-t border-border pt-5">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
               Contrato de execução
             </p>
             <p className="mt-2 text-[11px] leading-5 text-muted">
-              O mapa usa o mesmo motor já validado no worker. Alterações só entram em produção quando você salvar ou ativar a campanha.
+              O mapa V1 guarda apenas posições e arestas canônicas. Mensagens e execução continuam no motor validado do worker.
             </p>
           </div>
         </aside>

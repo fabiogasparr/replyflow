@@ -229,7 +229,7 @@ Progresso validado em 8 e 9 de setembro de 2026:
 ## Marco 7 — Expansões posteriores ao MVP
 
 - [ ] Facebook Pages e Messenger.
-- [ ] Construtor visual de fluxos com condições e ramificações. (Mapa visual do fluxo atual concluído; criação livre de novas condições e ramificações permanece pendente.)
+- [ ] Construtor visual de fluxos com condições e ramificações. (Mapa canônico reposicionável e persistido por revisão concluído; criação livre de novas condições e ramificações permanece pendente.)
 - [ ] Respostas assistidas por inteligência artificial.
 - [ ] Geração de campanhas e variações de texto por IA.
 - [ ] Classificação e resumo de conversas.
@@ -239,13 +239,16 @@ Progresso validado em 8 e 9 de setembro de 2026:
 
 Esses itens não devem atrasar o lançamento do núcleo comentário/DM, contatos e cobrança.
 
-Progresso validado em 9 de setembro de 2026:
+Progresso validado em 9 e 10 de setembro de 2026:
 
 - O construtor de campanhas agora abre em um mapa visual que projeta o mesmo contrato executado pelo worker, sem duplicar regras ou armazenar um segundo formato de automação.
 - Gatilho, resposta pública, abertura de DM, verificação de follow, entrega rastreada e follow-up aparecem como etapas selecionáveis com estado configurado, incompleto ou opcional.
 - Etapas opcionais podem ser ligadas ou desligadas no mapa; a edição de conteúdo leva ao campo exato no formulário e preserva a prévia do Instagram.
-- O mapa é navegável por teclado, funciona com rolagem horizontal em telas estreitas e não salva nem ativa campanhas implicitamente.
-- Condições livres, múltiplas ramificações e persistência de posições continuam reservadas para a próxima evolução do motor. Contrato e rollback estão em `docs/VISUAL_FLOW_BUILDER.md`.
+- O mapa é navegável por teclado, funciona com rolagem horizontal em telas estreitas e não ativa campanhas implicitamente.
+- Proprietários e administradores arrastam ou reposicionam etapas por teclado e salvam a organização compartilhada; integrantes mantêm leitura.
+- O contrato visual V1 aceita somente nós e arestas canônicos, fica isolado por workspace, registra auditoria sem conteúdo e usa revisão otimista para evitar sobrescrita concorrente.
+- A migration aditiva foi aprovada após as 34 migrations reais em PostgreSQL descartável e aplicada ao banco local. O worker e a integração oficial da Meta não leem o novo JSON.
+- Condições livres e múltiplas ramificações continuam reservadas para a próxima evolução do motor. Contrato, implantação e rollback estão em `docs/VISUAL_FLOW_BUILDER.md`.
 
 ## Próxima execução recomendada
 

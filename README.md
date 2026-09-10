@@ -42,7 +42,7 @@ OpenReply is built around Meta's official Instagram private replies. It does not
 - Multiple Instagram accounts. Connect several professional accounts under one workspace, each with its own limits.
 - Workspaces and roles. Owner, admin, and member roles with invite links, useful if you run this for clients.
 - Campaign templates. Start from a preset instead of a blank form.
-- Visual conversation map. See triggers, public and private branches, follow checks, tracked delivery, and follow-ups before activating a campaign.
+- Visual conversation map. See triggers, public and private branches, follow checks, tracked delivery, and follow-ups; drag the canonical stages and persist the shared layout safely by revision.
 - Inbox. Read your Instagram DM conversations and reply from the dashboard, inside Meta's 24-hour messaging window. Cached so it loads instantly on repeat visits.
 - DM logs. Every send, skip, and failure is logged with a reason.
 - Safe recovery. Owners and admins can reprocess pre-delivery failures without replaying ambiguous Meta sends; platform support has a sanitized, audited, single-item recovery desk without impersonation.

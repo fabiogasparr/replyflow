@@ -20,6 +20,7 @@ export const AUDIT_ACTIONS = {
   conversationMessageSent: "CONVERSATION_MESSAGE_SENT",
   dmRetryRequested: "DM_RETRY_REQUESTED",
   supportDmRetryRequested: "SUPPORT_DM_RETRY_REQUESTED",
+  automationFlowLayoutUpdated: "AUTOMATION_FLOW_LAYOUT_UPDATED",
   reportBrandUpdated: "REPORT_BRAND_UPDATED",
   reportPublished: "REPORT_PUBLISHED",
   reportRevoked: "REPORT_REVOKED",

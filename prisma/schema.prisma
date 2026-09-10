@@ -381,6 +381,12 @@ model Automation {
   reportSharePublishedAt  DateTime?
   reportShareRevokedAt    DateTime?
 
+  // Versioned visual topology. Message content and execution flags remain in
+  // the scalar fields above; this JSON stores only canonical nodes, edges and
+  // canvas positions so the worker never has two sources of truth.
+  flowDefinition Json?
+  flowRevision   Int   @default(0)
+
   // Operational projection maintained by the worker. It is intentionally
   // separate from isActive: an enabled campaign can still need attention when
   // its credentials or most recent platform execution failed.

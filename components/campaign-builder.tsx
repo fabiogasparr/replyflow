@@ -21,6 +21,10 @@ import {
   buildAutomationFlow,
   type AutomationFlowNodeId,
 } from "@/lib/automations/flow-map";
+import {
+  createDefaultFlowDefinition,
+  type FlowDefinitionV1,
+} from "@/lib/automations/flow-definition";
 import { readCache, writeCache } from "@/lib/client-cache";
 import {
   IMPORT_QUEUE_KEY,
@@ -189,6 +193,15 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
 
   const [previewTab, setPreviewTab] = useState<PreviewTab>("dm");
   const [builderView, setBuilderView] = useState<"map" | "form">("map");
+  const [flowLayout, setFlowLayout] = useState<FlowDefinitionV1>(() =>
+    createDefaultFlowDefinition()
+  );
+  const [flowLayoutRevision, setFlowLayoutRevision] = useState(0);
+  const [flowLayoutState, setFlowLayoutState] = useState<
+    "idle" | "loading" | "dirty" | "saving" | "saved" | "error" | "conflict"
+  >(mode === "edit" ? "loading" : "idle");
+  const [flowLayoutMessage, setFlowLayoutMessage] = useState<string | null>(null);
+  const [canPersistFlowLayout, setCanPersistFlowLayout] = useState(false);
 
   // CSV import queue. When present, each save advances to the next row instead
   // of returning to the campaigns list.
@@ -298,6 +311,40 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
+  }, [mode, campaignId]);
+
+  useEffect(() => {
+    if (mode !== "edit" || !campaignId) return;
+    let cancelled = false;
+    fetch(`/api/automations/${campaignId}/flow`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error ?? "Não foi possível carregar a organização do mapa");
+        }
+        if (cancelled) return;
+        setFlowLayout(payload.data.definition);
+        setFlowLayoutRevision(payload.data.revision);
+        setCanPersistFlowLayout(payload.data.canManage === true);
+        setFlowLayoutState("idle");
+        setFlowLayoutMessage(
+          payload.data.source === "recovered"
+            ? "Uma organização antiga inválida foi substituída pelo layout seguro padrão."
+            : null
+        );
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        setFlowLayoutState("error");
+        setFlowLayoutMessage(
+          cause instanceof Error
+            ? cause.message
+            : "Não foi possível carregar a organização do mapa"
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [mode, campaignId]);
 
   // Track which posts on the selected account are already assigned to an
@@ -429,6 +476,54 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
     if (nodeId === "opening-dm") setOpeningDmEnabled((value) => !value);
     if (nodeId === "follow-gate") setRequireFollow((value) => !value);
     if (nodeId === "follow-up") setFollowUpEnabled((value) => !value);
+  }
+
+  function changeFlowLayout(definition: FlowDefinitionV1) {
+    setFlowLayout(definition);
+    if (mode === "edit") {
+      setFlowLayoutState("dirty");
+      setFlowLayoutMessage("Organização alterada. Salve o mapa para compartilhar com a equipe.");
+    }
+  }
+
+  async function saveFlowLayout() {
+    if (mode !== "edit" || !campaignId || flowLayoutState === "saving") return;
+    setFlowLayoutState("saving");
+    setFlowLayoutMessage("Salvando organização…");
+    try {
+      const response = await fetch(`/api/automations/${campaignId}/flow`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision: flowLayoutRevision,
+          nodes: flowLayout.nodes,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        if (response.status === 409 && payload.latest) {
+          setFlowLayout(payload.latest.definition);
+          setFlowLayoutRevision(payload.latest.revision);
+          setFlowLayoutState("conflict");
+          setFlowLayoutMessage(
+            "Outra pessoa salvou primeiro. A versão mais recente foi carregada para evitar sobrescrita."
+          );
+          return;
+        }
+        throw new Error(payload.error ?? "Não foi possível salvar a organização do mapa");
+      }
+      setFlowLayout(payload.data.definition);
+      setFlowLayoutRevision(payload.data.revision);
+      setFlowLayoutState("saved");
+      setFlowLayoutMessage(`Organização salva na revisão ${payload.data.revision}.`);
+    } catch (cause) {
+      setFlowLayoutState("error");
+      setFlowLayoutMessage(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível salvar a organização do mapa"
+      );
+    }
   }
 
   function openFlowNode(nodeId: AutomationFlowNodeId) {
@@ -744,6 +839,13 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       {builderView === "map" ? (
         <AutomationFlowMap
           flow={flow}
+          layout={flowLayout}
+          layoutState={flowLayoutState}
+          layoutMessage={flowLayoutMessage}
+          isExisting={mode === "edit"}
+          canPersist={canPersistFlowLayout}
+          onLayoutChange={changeFlowLayout}
+          onSaveLayout={() => void saveFlowLayout()}
           onToggleNode={toggleFlowNode}
           onEditNode={openFlowNode}
         />

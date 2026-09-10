@@ -38,6 +38,7 @@ const actionLabels: Record<string, string> = {
   REPORT_PUBLISHED: "publicou um relatório de campanha",
   REPORT_REVOKED: "revogou um relatório de campanha",
   REPORT_LINK_ROTATED: "renovou o endereço de um relatório",
+  AUTOMATION_FLOW_LAYOUT_UPDATED: "organizou o mapa visual de uma campanha",
 };
 
 export default function WorkspaceAuditLog() {

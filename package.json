@@ -26,6 +26,7 @@
     "test:performance-reporting-db": "tsx scripts/test-performance-reporting-db.ts",
     "test:report-sharing-db": "tsx scripts/test-report-sharing-db.ts",
     "test:platform-support-db": "tsx scripts/test-platform-support-db.ts",
+    "test:flow-layout-db": "tsx scripts/test-flow-layout-db.ts",
     "admin:role": "tsx scripts/set-platform-admin.ts"
   },
   "dependencies": {

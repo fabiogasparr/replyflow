@@ -1,10 +1,6 @@
-export type AutomationFlowNodeId =
-  | "trigger"
-  | "public-reply"
-  | "opening-dm"
-  | "follow-gate"
-  | "delivery"
-  | "follow-up";
+import type { FlowNodeId } from "@/lib/automations/flow-definition";
+
+export type AutomationFlowNodeId = FlowNodeId;
 
 export type AutomationFlowNodeKind =
   | "trigger"

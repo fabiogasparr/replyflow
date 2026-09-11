@@ -39,7 +39,8 @@ const INSTAGRAM_OAUTH_ENV = [
 export function getMissingInstagramOAuthEnv(): string[] {
   return INSTAGRAM_OAUTH_ENV.filter((name) => {
     const value = process.env[name];
-    if (!value) return true;
+    if (!value || /^(?:your[-_]|replace|placeholder|changeme|test$)/i.test(value) || value.includes("...")) return true;
+    if (name === "INSTAGRAM_APP_ID" && !/^\d+$/.test(value)) return true;
     // A malformed key fails later inside encryptToken, after the user has
     // already round-tripped through Meta — catch the bad format here instead.
     return name === "ENCRYPTION_KEY" && !HEX_32_BYTE.test(value);

@@ -22,12 +22,34 @@ describe("OAuth state and token encryption", () => {
   });
 
   it("signs and verifies Instagram OAuth state", () => {
-    const state = createOAuthState("workspace_123");
+    const state = createOAuthState("workspace_123", "user_123");
     expect(verifyOAuthState(state)?.workspaceId).toBe("workspace_123");
   });
 
   it("rejects tampered OAuth state", () => {
-    const state = createOAuthState("workspace_123");
+    const state = createOAuthState("workspace_123", "user_123");
     expect(verifyOAuthState(`${state}tampered`)).toBeNull();
+  });
+
+  it("binds each attempt to a user and a unique nonce", () => {
+    const first = createOAuthState("workspace_123", "user_123");
+    const second = createOAuthState("workspace_123", "user_123");
+    expect(first).not.toBe(second);
+    expect(verifyOAuthState(first)?.userId).toBe("user_123");
+    expect(verifyOAuthState(`${first}.extra`)).toBeNull();
+  });
+
+  it("rejects expired and future-dated states", () => {
+    vi.useFakeTimers();
+    try {
+      const now = Date.now();
+      const state = createOAuthState("workspace_123", "user_123");
+      vi.setSystemTime(now + 601_000);
+      expect(verifyOAuthState(state)).toBeNull();
+      vi.setSystemTime(now - 1);
+      expect(verifyOAuthState(state)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -33,7 +33,8 @@ vi.mock("@/lib/instagram-accounts", () => ({
   canConnectInstagramAccount: mocks.canConnectInstagramAccount,
 }));
 vi.mock("@/lib/meta/oauth", () => ({
-  verifyOAuthState: () => ({ workspaceId: "workspace_1" }),
+  INSTAGRAM_STATE_COOKIE: "replyflow-instagram-state",
+  verifyOAuthState: () => ({ workspaceId: "workspace_1", userId: "user_1" }),
   exchangeCodeForToken: mocks.exchangeCodeForToken,
   encryptToken: () => "encrypted-token",
 }));
@@ -80,11 +81,33 @@ beforeEach(() => {
 
 function callbackRequest() {
   return new NextRequest(
-    "http://localhost:3000/api/instagram/callback?code=code&state=state"
+    "http://localhost:3000/api/instagram/callback?code=code&state=state",
+    { headers: { cookie: "replyflow-instagram-state=state" } },
   );
 }
 
 describe("Instagram callback workspace isolation", () => {
+  it("rejects callbacks without the initiating browser cookie", async () => {
+    const response = await GET(new NextRequest("http://localhost:3000/api/instagram/callback?code=code&state=state"));
+    expect(response.headers.get("location")).toContain("instagram=invalid");
+    expect(mocks.exchangeCodeForToken).not.toHaveBeenCalled();
+  });
+
+  it("rejects a callback completed by a different signed-in user", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user_other" } });
+    const response = await GET(callbackRequest());
+    expect(response.headers.get("location")).toContain("instagram=invalid");
+    expect(mocks.exchangeCodeForToken).not.toHaveBeenCalled();
+    expect(mocks.prisma.workspaceMember.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("does not return a remote error containing credentials in the URL or event", async () => {
+    mocks.exchangeCodeForToken.mockRejectedValueOnce(new Error("access_token=secret-customer-token"));
+    const response = await GET(callbackRequest());
+    expect(response.headers.get("location")).toBe("http://localhost:3000/settings?instagram=failed");
+    expect(JSON.stringify(mocks.prisma.operationalEvent.create.mock.calls)).not.toContain("secret-customer-token");
+    expect(response.cookies.get("replyflow-instagram-state")?.value).toBe("");
+  });
   it("does not transfer an account found in another workspace", async () => {
     mocks.transaction.instagramAccount.findUnique.mockResolvedValue({
       id: "account_1",

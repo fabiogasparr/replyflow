@@ -8,6 +8,7 @@ import {
   encryptToken,
   exchangeCodeForToken,
   verifyOAuthState,
+  INSTAGRAM_STATE_COOKIE,
 } from "@/lib/meta/oauth";
 import { canManageInstagram } from "@/lib/workspace-access";
 import { AUDIT_ACTIONS, createAuditEventData } from "@/lib/audit";
@@ -21,31 +22,46 @@ import { clearAutomationCredentialFailures } from "@/lib/automations/operational
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const error = request.nextUrl.searchParams.get("error");
-  const state = verifyOAuthState(request.nextUrl.searchParams.get("state"));
+  const rawState = request.nextUrl.searchParams.get("state");
+  const state = rawState && request.cookies.get(INSTAGRAM_STATE_COOKIE)?.value === rawState
+    ? verifyOAuthState(rawState) : null;
   const baseUrl = getBaseUrl();
+  function redirect(url: string) {
+    const response = NextResponse.redirect(url);
+    response.cookies.set(INSTAGRAM_STATE_COOKIE, "", {
+      httpOnly: true, secure: baseUrl.startsWith("https://"), sameSite: "lax",
+      path: "/api/instagram/callback", maxAge: 0,
+    });
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
 
   if (error) {
-    return NextResponse.redirect(`${baseUrl}/settings?instagram=denied`);
+    return redirect(`${baseUrl}/settings?instagram=denied`);
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(`${baseUrl}/settings?instagram=invalid`);
+    return redirect(`${baseUrl}/settings?instagram=invalid`);
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.redirect(`${baseUrl}/login`);
+    return redirect(`${baseUrl}/login`);
+  }
+  if (state.userId !== session.user.id) {
+    return redirect(`${baseUrl}/settings?instagram=invalid`);
   }
 
   const membership = await prisma.workspaceMember.findFirst({
     where: {
       workspaceId: state.workspaceId,
       userId: session.user.id,
+      workspace: { archivedAt: null },
     },
   });
 
   if (!membership || !canManageInstagram(membership.role)) {
-    return NextResponse.redirect(`${baseUrl}/settings?instagram=forbidden`);
+    return redirect(`${baseUrl}/settings?instagram=forbidden`);
   }
 
   try {
@@ -76,7 +92,7 @@ export async function GET(request: NextRequest) {
           : connection.reason === "already_connected"
             ? "already_connected"
             : "failed";
-      return NextResponse.redirect(
+      return redirect(
         `${baseUrl}/settings?instagram=${status}`
       );
     }
@@ -91,10 +107,9 @@ export async function GET(request: NextRequest) {
         longLivedToken
       );
       webhookSubscribed = Boolean(subscription.success);
-    } catch (subscriptionError) {
+    } catch {
       console.warn(
-        "[Instagram Callback] Webhook subscription failed:",
-        subscriptionError
+        "[Instagram Callback] Webhook subscription failed; reconnect to retry."
       );
     }
 
@@ -105,6 +120,7 @@ export async function GET(request: NextRequest) {
             workspaceId: state.workspaceId,
             userId: session.user.id,
           },
+          workspace: { archivedAt: null },
         },
         select: { role: true },
       });
@@ -192,20 +208,18 @@ export async function GET(request: NextRequest) {
       });
     }, { isolationLevel: "Serializable" });
 
-    return NextResponse.redirect(`${baseUrl}/dashboard?connected=true`);
+    return redirect(`${baseUrl}/dashboard?connected=true`);
   } catch (err) {
     if (err instanceof WorkspacePlanLimitError) {
-      return NextResponse.redirect(`${baseUrl}/settings?instagram=plan_limit`);
+      return redirect(`${baseUrl}/settings?instagram=plan_limit`);
     }
     if (err instanceof WorkspaceBillingSetupError) {
-      return NextResponse.redirect(`${baseUrl}/settings?instagram=billing_setup`);
+      return redirect(`${baseUrl}/settings?instagram=billing_setup`);
     }
 
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[Instagram Callback] Error:", err);
-    // The message is the only diagnostic a self-hoster gets for a failed
-    // connect, so persist it alongside the other operational events rather
-    // than leaving it in server logs they may not be able to reach.
+    const message = "Falha ao conectar Instagram. Verifique configuração, permissões e disponibilidade da Meta.";
+    console.error("[Instagram Callback] Connection failed");
+    // Remote errors may contain tokens: persist only a fixed safe description.
     await prisma.operationalEvent
       .create({
         data: {
@@ -218,10 +232,6 @@ export async function GET(request: NextRequest) {
       })
       .catch(() => {});
 
-    return NextResponse.redirect(
-      `${baseUrl}/settings?instagram=failed&reason=${encodeURIComponent(
-        message.slice(0, 200)
-      )}`
-    );
+    return redirect(`${baseUrl}/settings?instagram=failed`);
   }
 }

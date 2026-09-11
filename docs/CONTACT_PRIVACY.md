@@ -12,7 +12,7 @@ O perfil de contato oferece dois controles administrativos: exportar uma cópia 
 
 ## Conteúdo da exportação
 
-O JSON inclui o perfil, etiquetas, anotações, conta associada, estado local das conversas, interações processadas por automações e os registros de deduplicação atribuíveis a essas interações. Tokens de acesso, erros internos e credenciais nunca são selecionados. O arquivo é entregue com `Cache-Control: private, no-store` e nome derivado apenas do ID interno saneado.
+O JSON inclui o perfil, etiquetas, anotações, campos personalizados ativos ou inativos, conta associada, estado local das conversas, interações processadas por automações e os registros de deduplicação atribuíveis a essas interações. Tokens de acesso, erros internos e credenciais nunca são selecionados. O arquivo é entregue com `Cache-Control: private, no-store` e nome derivado apenas do ID interno saneado.
 
 O ReplyFlow não possui o histórico completo das mensagens: os corpos completos continuam na Meta. Cliques também não aparecem na exportação individual porque o modelo atual mantém métricas de clique sem uma identidade técnica do destinatário.
 

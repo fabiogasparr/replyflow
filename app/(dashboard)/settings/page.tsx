@@ -7,6 +7,7 @@ import WorkspaceManager from "@/components/workspace-manager";
 import WorkspaceAuditLog from "@/components/workspace-audit-log";
 import BillingActivity from "@/components/billing-activity";
 import { formatNumber } from "@/lib/i18n";
+import ContactFieldManager from "@/components/contact-field-manager";
 
 interface SettingsData {
   workspace: {
@@ -355,6 +356,8 @@ export default function SettingsPage() {
       </section>
 
       <WorkspaceManager />
+
+      <ContactFieldManager />
 
       <section className="panel rounded p-4 sm:p-6">
         <h2 className="mb-1 text-base font-semibold">Equipe</h2>

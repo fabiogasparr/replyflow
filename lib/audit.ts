@@ -18,6 +18,8 @@ export const AUDIT_ACTIONS = {
   contactUpdated: "CONTACT_UPDATED",
   contactDataExported: "CONTACT_DATA_EXPORTED",
   contactDataAnonymized: "CONTACT_DATA_ANONYMIZED",
+  contactFieldCreated: "CONTACT_FIELD_CREATED",
+  contactFieldUpdated: "CONTACT_FIELD_UPDATED",
   conversationUpdated: "CONVERSATION_UPDATED",
   conversationMessageSent: "CONVERSATION_MESSAGE_SENT",
   dmRetryRequested: "DM_RETRY_REQUESTED",

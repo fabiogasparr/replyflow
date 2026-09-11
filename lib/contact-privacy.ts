@@ -70,6 +70,17 @@ export async function getContactPrivacyExport(input: {
             updatedAt: true,
           },
         },
+        customFieldValues: {
+          orderBy: [{ fieldDefinition: { position: "asc" } }, { id: "asc" }],
+          select: {
+            value: true,
+            createdAt: true,
+            updatedAt: true,
+            fieldDefinition: {
+              select: { id: true, name: true, type: true, options: true, isActive: true },
+            },
+          },
+        },
       },
     });
     if (!contact) {
@@ -134,6 +145,7 @@ export async function getContactPrivacyExport(input: {
           interactionCount: interactions.length,
           conversationCount: contact.conversations.length,
           processedCommentCount: processedComments.length,
+          customFieldValueCount: contact.customFieldValues.length,
         },
       }),
     });
@@ -159,6 +171,7 @@ export async function getContactPrivacyExport(input: {
         updatedAt: contact.updatedAt,
       },
       conversations: contact.conversations,
+      customFields: contact.customFieldValues,
       automationInteractions: interactions,
       processedComments,
       limitations: [

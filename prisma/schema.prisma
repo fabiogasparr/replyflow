@@ -87,22 +87,24 @@ model Workspace {
   reportBrandName   String?
   reportBrandColor  String   @default("#112620")
 
-  members           WorkspaceMember[]
-  activeUsers       User[]                @relation("UserActiveWorkspace")
-  invitations       WorkspaceInvitation[]
-  instagramAccounts InstagramAccount[]
-  automations       Automation[]
-  dmLogs            DmLog[]
-  trackedLinks      TrackedLink[]
-  linkClicks        LinkClick[]
-  webhookEvents     WebhookEvent[]
-  operationalEvents OperationalEvent[]
-  auditEvents       AuditEvent[]
-  contacts          Contact[]
-  conversations     Conversation[]
-  subscription      Subscription?
-  usageRecords      UsageRecord[]
-  billingEvents     BillingEvent[]
+  members                 WorkspaceMember[]
+  activeUsers             User[]                   @relation("UserActiveWorkspace")
+  invitations             WorkspaceInvitation[]
+  instagramAccounts       InstagramAccount[]
+  automations             Automation[]
+  dmLogs                  DmLog[]
+  trackedLinks            TrackedLink[]
+  linkClicks              LinkClick[]
+  webhookEvents           WebhookEvent[]
+  operationalEvents       OperationalEvent[]
+  auditEvents             AuditEvent[]
+  contacts                Contact[]
+  conversations           Conversation[]
+  subscription            Subscription?
+  usageRecords            UsageRecord[]
+  billingEvents           BillingEvent[]
+  contactFieldDefinitions ContactFieldDefinition[]
+  contactFieldValues      ContactFieldValue[]
 
   @@index([ownerId])
   @@index([archivedAt])
@@ -277,14 +279,56 @@ model Contact {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  instagramAccount InstagramAccount @relation(fields: [instagramAccountId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  conversations    Conversation[]
+  workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instagramAccount  InstagramAccount    @relation(fields: [instagramAccountId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  conversations     Conversation[]
+  customFieldValues ContactFieldValue[]
 
+  @@unique([id, workspaceId])
   @@unique([workspaceId, instagramAccountId, instagramScopedId], map: "Contact_workspace_account_scoped_key")
   @@unique([id, workspaceId, instagramAccountId])
   @@index([workspaceId, lastSeenAt])
   @@index([workspaceId, instagramAccountId, lastSeenAt])
+}
+
+/// Workspace-owned schema for structured CRM data. Definitions are soft-
+/// disabled so historical values remain available for privacy exports.
+model ContactFieldDefinition {
+  id             String                 @id @default(cuid())
+  workspaceId    String
+  name           String
+  normalizedName String
+  type           ContactCustomFieldType
+  options        String[]               @default([])
+  position       Int                    @default(0)
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  values    ContactFieldValue[]
+
+  @@unique([workspaceId, normalizedName])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, isActive, position])
+}
+
+model ContactFieldValue {
+  id                String   @id @default(cuid())
+  workspaceId       String
+  contactId         String
+  fieldDefinitionId String
+  value             String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workspace       Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact         Contact                @relation(fields: [contactId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  fieldDefinition ContactFieldDefinition @relation(fields: [fieldDefinitionId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([contactId, fieldDefinitionId])
+  @@index([workspaceId, fieldDefinitionId])
+  @@index([contactId])
 }
 
 /// Team-owned state layered over a conversation fetched from Meta's official API.
@@ -349,35 +393,35 @@ model Automation {
   goal                    String?
   postId                  String?
   postUrl                 String?
-  pendingNextReel         Boolean  @default(false)
-  matchAnyPost            Boolean  @default(false)
+  pendingNextReel         Boolean   @default(false)
+  matchAnyPost            Boolean   @default(false)
   keywords                String[]
-  matchAnyWord            Boolean  @default(false)
+  matchAnyWord            Boolean   @default(false)
   // Also fire this campaign when someone sends a DM whose text matches the
   // keywords above. Independent of the post trigger — a DM has no media, so
   // postId / matchAnyPost do not apply to it.
-  dmTriggerEnabled        Boolean  @default(false)
+  dmTriggerEnabled        Boolean   @default(false)
   dmMessage               String
-  openingDmEnabled        Boolean  @default(false)
+  openingDmEnabled        Boolean   @default(false)
   openingDmMessage        String?
   openingDmButtonLabel    String?
   linkButtonLabel         String?
-  requireFollow           Boolean  @default(false)
+  requireFollow           Boolean   @default(false)
   followPromptMessage     String?
   followPromptButtonLabel String?
-  followUpEnabled         Boolean  @default(false)
+  followUpEnabled         Boolean   @default(false)
   followUpMessage         String?
   // Minutes to wait after the link is delivered before sending the follow-up.
   // 0 sends it right away.
-  followUpDelayMinutes    Int      @default(0)
-  publicReplyEnabled      Boolean  @default(false)
+  followUpDelayMinutes    Int       @default(0)
+  publicReplyEnabled      Boolean   @default(false)
   publicReplyMessage      String?
-  publicReplyMessages     String[] @default([])
-  isActive                Boolean  @default(true)
-  wholeWordMatch          Boolean  @default(true)
-  reportShareSlug         String?  @unique
-  reportShareEnabled      Boolean  @default(false)
-  reportSharePeriodDays   Int      @default(30)
+  publicReplyMessages     String[]  @default([])
+  isActive                Boolean   @default(true)
+  wholeWordMatch          Boolean   @default(true)
+  reportShareSlug         String?   @unique
+  reportShareEnabled      Boolean   @default(false)
+  reportSharePeriodDays   Int       @default(30)
   reportSharePublishedAt  DateTime?
   reportShareRevokedAt    DateTime?
 
@@ -586,6 +630,14 @@ enum WorkspaceRole {
   OWNER
   ADMIN
   MEMBER
+}
+
+enum ContactCustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
 }
 
 enum PlatformRole {

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import StatusBadge from "@/components/status-badge";
 import { ContactAvatar, ContactLoading, ContactPagination, ContactTags } from "@/components/contact-ui";
 import type { ContactDetail, ContactInteraction } from "@/lib/contacts";
+import type { ContactCustomField } from "@/lib/contact-custom-fields";
 import { formatDateTime, formatNumber } from "@/lib/i18n";
 
 type ContactData = {
@@ -13,6 +14,7 @@ type ContactData = {
   canEdit: boolean;
   canExport: boolean;
   canErase: boolean;
+  customFields: ContactCustomField[];
 };
 type HistoryData = { interactions: ContactInteraction[]; total: number; page: number; pageSize: number };
 
@@ -38,6 +40,7 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
   const [request, setRequest] = useState({ revision: 0, keepDraft: false });
   const [tagInput, setTagInput] = useState("");
   const [notes, setNotes] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -72,6 +75,9 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
         } else {
           setNotes(next.contact.notes ?? "");
           setTagInput(next.contact.tags.join(", "));
+          setCustomFieldValues(Object.fromEntries(
+            next.customFields.map((field) => [field.id, field.value ?? ""]),
+          ));
           setComparison(null);
         }
         setConflict(false);
@@ -114,7 +120,10 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
   const tags = parseTags(tagInput);
   const dirty = Boolean(data && (
     notes.trim() !== (data.contact.notes ?? "") ||
-    JSON.stringify(tags) !== JSON.stringify(data.contact.tags)
+    JSON.stringify(tags) !== JSON.stringify(data.contact.tags) ||
+    data.customFields.some((field) =>
+      (customFieldValues[field.id] ?? "") !== (field.value ?? "")
+    )
   ));
 
   useEffect(() => {
@@ -142,6 +151,9 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
     if (!data || !window.confirm("Descartar suas alterações e usar as notas e etiquetas salvas no contato?")) return;
     setNotes(data.contact.notes ?? "");
     setTagInput(data.contact.tags.join(", "));
+    setCustomFieldValues(Object.fromEntries(
+      data.customFields.map((field) => [field.id, field.value ?? ""]),
+    ));
     setComparison(null);
     setSaveError(null);
     setNotice("O rascunho foi descartado. Você está vendo os dados salvos.");
@@ -164,12 +176,25 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
     const controller = new AbortController();
     saveController.current = controller;
     setSaving(true);
+    const changedCustomFields = data.customFields
+      .filter((field) => (customFieldValues[field.id] ?? "") !== (field.value ?? ""))
+      .map((field) => ({
+        fieldDefinitionId: field.id,
+        value: customFieldValues[field.id] || null,
+      }));
+    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(data.contact.tags);
+    const notesChanged = notes.trim() !== (data.contact.notes ?? "");
     try {
       const response = await fetch(`/api/contacts/${encodeURIComponent(contactId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
-        body: JSON.stringify({ tags, notes: notes.trim() || null, version: data.contact.version }),
+        body: JSON.stringify({
+          version: data.contact.version,
+          ...(tagsChanged ? { tags } : {}),
+          ...(notesChanged ? { notes: notes.trim() || null } : {}),
+          ...(changedCustomFields.length ? { customFields: changedCustomFields } : {}),
+        }),
       });
       const payload = await response.json();
       if (controller.signal.aborted) return;
@@ -182,11 +207,23 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
         throw new Error(payload.error ?? "Não foi possível salvar as alterações.");
       }
       const contact: ContactDetail = payload.data.contact;
-      setData((current) => current ? { ...current, contact } : current);
+      const savedFields: Array<{ fieldDefinitionId: string; value: string | null }> = payload.data.customFields ?? [];
+      setData((current) => current ? {
+        ...current,
+        contact,
+        customFields: current.customFields.map((field) => {
+          const saved = savedFields.find((item) => item.fieldDefinitionId === field.id);
+          return saved ? { ...field, value: saved.value } : field;
+        }),
+      } : current);
       setNotes(contact.notes ?? "");
       setTagInput(contact.tags.join(", "));
+      setCustomFieldValues((current) => ({
+        ...current,
+        ...Object.fromEntries(savedFields.map((field) => [field.fieldDefinitionId, field.value ?? ""])),
+      }));
       setComparison(null);
-      setNotice("Etiquetas e anotações salvas.");
+      setNotice("Alterações do contato salvas.");
     } catch (failure) {
       if (!controller.signal.aborted) {
         setSaveError(failure instanceof Error ? failure.message : "Não foi possível salvar. Seu rascunho foi mantido; tente novamente.");
@@ -309,6 +346,48 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
                 <textarea id="contact-notes" value={notes} onChange={(event) => { setNotes(event.target.value); setNotice(null); }} disabled={saving || loading} rows={8} maxLength={5000} aria-describedby="contact-notes-hint" placeholder="Registre o contexto da conversa e os próximos passos da equipe…" className="mt-2 w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6 outline-none focus:border-accent disabled:opacity-60" />
                 <p id="contact-notes-hint" className="mt-1 text-right text-xs text-muted">{formatNumber(notes.length)} / 5.000 caracteres</p>
               </div>
+              <div className="border-t border-border pt-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Dados personalizados</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted">Informações estruturadas definidas pelo seu workspace.</p>
+                  </div>
+                  <Link href="/settings#contact-fields" className="shrink-0 text-xs font-semibold text-success underline underline-offset-4">Configurar</Link>
+                </div>
+                {data.customFields.length === 0 ? (
+                  <p className="mt-4 rounded-lg bg-surface p-3 text-xs leading-5 text-muted">Nenhum campo personalizado ativo. Crie o primeiro nas configurações.</p>
+                ) : (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                    {data.customFields.map((field) => {
+                      const inputId = `contact-custom-field-${field.id}`;
+                      const value = customFieldValues[field.id] ?? "";
+                      const updateValue = (next: string) => {
+                        setCustomFieldValues((current) => ({ ...current, [field.id]: next }));
+                        setNotice(null);
+                      };
+                      return (
+                        <label key={field.id} htmlFor={inputId} className="space-y-2 text-xs font-semibold text-foreground">
+                          <span>{field.name}</span>
+                          {field.type === "BOOLEAN" ? (
+                            <select id={inputId} value={value} onChange={(event) => updateValue(event.target.value)} disabled={saving || loading} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-normal outline-none focus:border-accent disabled:opacity-60">
+                              <option value="">Não informado</option>
+                              <option value="true">Sim</option>
+                              <option value="false">Não</option>
+                            </select>
+                          ) : field.type === "SELECT" ? (
+                            <select id={inputId} value={value} onChange={(event) => updateValue(event.target.value)} disabled={saving || loading} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-normal outline-none focus:border-accent disabled:opacity-60">
+                              <option value="">Não informado</option>
+                              {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                          ) : (
+                            <input id={inputId} type={field.type === "DATE" ? "date" : "text"} inputMode={field.type === "NUMBER" ? "decimal" : undefined} value={value} onChange={(event) => updateValue(event.target.value)} disabled={saving || loading} maxLength={field.type === "TEXT" ? 1000 : undefined} placeholder={field.type === "NUMBER" ? "Ex.: 1500,00" : "Não informado"} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-normal outline-none focus:border-accent disabled:opacity-60" />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               {saveError && <p role="alert" className="rounded-lg border border-error/20 bg-error/5 p-3 text-sm leading-6 text-error">{saveError}</p>}
               {loadError && <p role="alert" className="rounded-lg border border-error/20 bg-error/5 p-3 text-sm leading-6 text-error">{loadError}</p>}
               {notice && <p role="status" className="rounded-lg border border-success/20 bg-success/5 p-3 text-sm leading-6 text-success">{notice}</p>}
@@ -330,6 +409,19 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
             <div className="mt-6 space-y-6">
               <div><h3 className="mb-3 text-sm font-semibold">Etiquetas</h3><ContactTags tags={contact.tags} /></div>
               <div><h3 className="mb-3 text-sm font-semibold">Anotações</h3><p className="whitespace-pre-wrap break-words text-sm leading-7 text-muted">{contact.notes || "A equipe ainda não adicionou anotações."}</p></div>
+              {data.customFields.length > 0 && (
+                <div className="border-t border-border pt-4">
+                  <h3 className="mb-3 text-sm font-semibold">Dados personalizados</h3>
+                  <dl className="space-y-3">
+                    {data.customFields.map((field) => (
+                      <div key={field.id} className="flex items-start justify-between gap-4 text-sm">
+                        <dt className="text-muted">{field.name}</dt>
+                        <dd className="break-words text-right font-medium">{field.value === "true" ? "Sim" : field.value === "false" ? "Não" : field.value || "Não informado"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
               <p className="border-t border-border pt-4 text-xs leading-5 text-muted">Proprietários e administradores podem editar as informações deste contato.</p>
             </div>
           )}

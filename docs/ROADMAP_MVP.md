@@ -132,7 +132,7 @@ Progresso validado em 5 de setembro de 2026:
 
 Objetivo: transformar interações isoladas em relacionamento persistente.
 
-- [ ] Criar entidades `Contact`, `Conversation`, `Message`, `Tag` e `CustomField`. (`Contact` e `Conversation` concluídos.)
+- [ ] Criar entidades `Contact`, `Conversation`, `Message`, `Tag` e `CustomField`. (`Contact`, `Conversation` e campos personalizados concluídos.)
 - [x] Migrar ou associar logs existentes aos contatos.
 - [ ] Criar perfil do contato com histórico de comentários, DMs e cliques. (Comentários e respostas de automação concluídos; cliques aguardam identificação do destinatário.)
 - [ ] Permitir tags manuais e automáticas. (Etiquetas manuais concluídas.)
@@ -165,6 +165,8 @@ Progresso validado em 5 e 10 de setembro de 2026:
 - Proprietários e administradores exportam o perfil e seu histórico em JSON; somente o proprietário pode anonimizar dados pessoais com confirmação nominal e controle de concorrência.
 - A anonimização remove perfil, notas, conversas e conteúdo diretamente identificável dos logs; métricas e IDs técnicos de deduplicação permanecem para evitar reenvio de eventos antigos.
 - O gatilho do banco ignora tombstones de privacidade, evitando que uma atualização posterior recrie o contato; limites, responsabilidade do controlador e rollback estão em `docs/CONTACT_PRIVACY.md`.
+- Workspaces configuram até 20 campos personalizados ativos de texto, número, data, sim/não ou seleção; valores usam a mesma edição concorrente de notas e etiquetas.
+- Definições, valores e contatos são unidos por chaves compostas de workspace; desativação preserva histórico e exclusão do contato remove valores por cascata. Contratos e rollback estão em `docs/CONTACT_CUSTOM_FIELDS.md`.
 
 ## Marco 5 — Planos e cobrança
 

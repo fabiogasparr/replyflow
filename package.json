@@ -16,6 +16,7 @@
     "test": "vitest run --configLoader runner",
     "test:contacts-db": "tsx scripts/test-contacts-db.ts",
     "test:contact-privacy-db": "tsx scripts/test-contact-privacy-db.ts",
+    "test:contact-custom-fields-db": "tsx scripts/test-contact-custom-fields-db.ts",
     "test:conversations-db": "tsx scripts/test-conversations-db.ts",
     "test:dm-retry-db": "tsx scripts/test-dm-retry-db.ts",
     "test:dm-retry-queue": "tsx scripts/test-dm-retry-queue.ts",

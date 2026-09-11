@@ -34,7 +34,12 @@ export async function GET(_request: NextRequest, route: ContactRouteContext) {
 
   return NextResponse.json({
     success: true,
-    data: { contact, canEdit: canManageContacts(context.role) },
+    data: {
+      contact,
+      canEdit: canManageContacts(context.role),
+      canExport: canManageContacts(context.role),
+      canErase: context.role === "OWNER",
+    },
   });
 }
 

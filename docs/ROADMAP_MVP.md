@@ -139,7 +139,7 @@ Objetivo: transformar interações isoladas em relacionamento persistente.
 - [x] Criar segmentos por origem, campanha, engajamento e data.
 - [x] Evoluir o inbox com atribuição, status, busca e notas.
 - [ ] Aplicar a janela de mensagens da Meta na interface. (Estimativa e aviso concluídos; regras especiais ainda dependem da resposta oficial da Meta.)
-- [ ] Implementar exportação e exclusão de dados pessoais.
+- [x] Implementar exportação e anonimização de dados pessoais armazenados no ReplyFlow.
 
 Critério de saída: a equipe consegue identificar um contato, acompanhar seu histórico e responder com contexto.
 
@@ -162,6 +162,9 @@ Progresso validado em 5 e 10 de setembro de 2026:
 - O recorte fica na URL e pode ser compartilhado sem conceder acesso; autenticação e workspace continuam obrigatórios para abrir os dados.
 - Campanha, origem e resultado são correlacionados na mesma interação com SQL parametrizado e quatro limites explícitos de isolamento.
 - Nenhuma projeção duplicada ou migration foi necessária; modelo, desempenho, privacidade e rollback estão documentados em `docs/CONTACT_SEGMENTS.md`.
+- Proprietários e administradores exportam o perfil e seu histórico em JSON; somente o proprietário pode anonimizar dados pessoais com confirmação nominal e controle de concorrência.
+- A anonimização remove perfil, notas, conversas e conteúdo diretamente identificável dos logs; métricas e IDs técnicos de deduplicação permanecem para evitar reenvio de eventos antigos.
+- O gatilho do banco ignora tombstones de privacidade, evitando que uma atualização posterior recrie o contato; limites, responsabilidade do controlador e rollback estão em `docs/CONTACT_PRIVACY.md`.
 
 ## Marco 5 — Planos e cobrança
 

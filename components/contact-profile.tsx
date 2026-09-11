@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import StatusBadge from "@/components/status-badge";
 import { ContactAvatar, ContactLoading, ContactPagination, ContactTags } from "@/components/contact-ui";
 import type { ContactDetail, ContactInteraction } from "@/lib/contacts";
 import { formatDateTime, formatNumber } from "@/lib/i18n";
 
-type ContactData = { contact: ContactDetail; canEdit: boolean };
+type ContactData = {
+  contact: ContactDetail;
+  canEdit: boolean;
+  canExport: boolean;
+  canErase: boolean;
+};
 type HistoryData = { interactions: ContactInteraction[]; total: number; page: number; pageSize: number };
 
 function parseTags(value: string) {
@@ -25,6 +31,7 @@ function parseTags(value: string) {
 }
 
 export default function ContactProfile({ contactId }: { contactId: string }) {
+  const router = useRouter();
   const [data, setData] = useState<ContactData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,6 +47,11 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRequest, setHistoryRequest] = useState({ page: 1, revision: 0 });
+  const [exporting, setExporting] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
+  const [eraseOpen, setEraseOpen] = useState(false);
+  const [eraseConfirmation, setEraseConfirmation] = useState("");
+  const [erasing, setErasing] = useState(false);
   const saveController = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -184,6 +196,59 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
     }
   }
 
+  async function exportContactData() {
+    if (!data?.canExport || exporting) return;
+    setExporting(true);
+    setPrivacyError(null);
+    try {
+      const response = await fetch(`/api/contacts/${encodeURIComponent(contactId)}/privacy`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Não foi possível exportar os dados deste contato.");
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? "replyflow-dados-contato.json";
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(href);
+    } catch (failure) {
+      setPrivacyError(failure instanceof Error ? failure.message : "Não foi possível exportar os dados deste contato.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function eraseContactData(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!data?.canErase || erasing || dirty) return;
+    setErasing(true);
+    setPrivacyError(null);
+    try {
+      const response = await fetch(`/api/contacts/${encodeURIComponent(contactId)}/privacy`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          version: data.contact.version,
+          confirmation: eraseConfirmation,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error ?? "Não foi possível anonimizar os dados deste contato.");
+      }
+      router.push("/contacts?privacy=removed");
+    } catch (failure) {
+      setPrivacyError(failure instanceof Error ? failure.message : "Não foi possível anonimizar os dados deste contato.");
+      setErasing(false);
+    }
+  }
+
   if (!data) {
     return (
       <div className="mx-auto max-w-6xl space-y-5">
@@ -201,7 +266,10 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
     );
   }
 
-  const { contact, canEdit } = data;
+  const { contact, canEdit, canExport, canErase } = data;
+  const deletionConfirmation = contact.username
+    ? `EXCLUIR @${contact.username}`
+    : `EXCLUIR ${contact.instagramScopedId}`;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -302,6 +370,60 @@ export default function ContactProfile({ contactId }: { contactId: string }) {
           )}
         </section>
       </div>
+
+      {(canExport || canErase) && (
+        <section className="overflow-hidden rounded-2xl border border-[#244a3d] bg-[#112620] text-white" aria-labelledby="contact-privacy-title">
+          <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f4bd4f]">Privacidade e dados</p>
+              <h2 id="contact-privacy-title" className="font-display mt-2 text-2xl font-bold">Controle do registro pessoal</h2>
+              <p className="mt-3 text-sm leading-6 text-white/70">
+                Exporte uma cópia estruturada ou anonimiza os dados identificáveis armazenados no ReplyFlow. Dados mantidos pela Meta seguem os processos próprios do Instagram.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 lg:justify-end">
+              {canExport && (
+                <button type="button" onClick={() => void exportContactData()} disabled={exporting || erasing} className="rounded-lg bg-[#f4bd4f] px-4 py-2.5 text-sm font-bold text-[#112620] transition hover:bg-[#ffd47a] disabled:cursor-not-allowed disabled:opacity-60">
+                  {exporting ? "Preparando arquivo…" : "Exportar dados em JSON"}
+                </button>
+              )}
+              {canErase && (
+                <button type="button" onClick={() => { setEraseOpen(true); setPrivacyError(null); }} disabled={exporting || erasing} className="rounded-lg border border-white/25 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-60">
+                  Anonimizar dados
+                </button>
+              )}
+            </div>
+          </div>
+
+          {privacyError && <p role="alert" className="border-t border-white/15 bg-[#3a1717] px-5 py-3 text-sm text-[#ffd5d5] sm:px-7">{privacyError}</p>}
+
+          {eraseOpen && canErase && (
+            <div className="border-t border-white/15 bg-black/15 p-5 sm:p-7">
+              <form onSubmit={(event) => void eraseContactData(event)} className="max-w-3xl">
+                <h3 className="text-lg font-bold">Confirmar anonimização permanente</h3>
+                <p className="mt-2 text-sm leading-6 text-white/70">
+                  O perfil, as notas, etiquetas, conversas locais e eventos brutos vinculados serão removidos. Conteúdo e identidade direta serão anonimizados; datas, resultados e IDs técnicos de deduplicação continuarão protegendo as métricas e evitando reenvios.
+                </p>
+                {dirty && (
+                  <p role="alert" className="mt-4 rounded-lg border border-[#f4bd4f]/40 bg-[#f4bd4f]/10 p-3 text-sm text-[#ffe2a3]">
+                    Salve ou descarte as alterações do perfil antes de continuar.
+                  </p>
+                )}
+                <label htmlFor="contact-erase-confirmation" className="mt-5 block text-sm font-semibold">
+                  Digite <span className="font-mono text-[#f4bd4f]">{deletionConfirmation}</span>
+                </label>
+                <input id="contact-erase-confirmation" value={eraseConfirmation} onChange={(event) => setEraseConfirmation(event.target.value)} disabled={erasing} autoComplete="off" spellCheck={false} className="mt-2 w-full rounded-lg border border-white/25 bg-white/10 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#f4bd4f] disabled:opacity-60" />
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button type="submit" disabled={dirty || erasing || eraseConfirmation !== deletionConfirmation} className="rounded-lg bg-[#d74b4b] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#ef6262] disabled:cursor-not-allowed disabled:opacity-45">
+                    {erasing ? "Anonimizando…" : "Anonimizar permanentemente"}
+                  </button>
+                  <button type="button" onClick={() => { setEraseOpen(false); setEraseConfirmation(""); setPrivacyError(null); }} disabled={erasing} className="rounded-lg border border-white/25 px-4 py-2.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-60">Cancelar</button>
+                </div>
+              </form>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ const emptyFilters = {
   engagement: "",
   activeWithinDays: 0,
   page: 1,
+  privacyNotice: false,
 };
 
 type ContactFilters = typeof emptyFilters;
@@ -67,6 +68,7 @@ export default function ContactsPage() {
       engagement: params.get("engagement") ?? "",
       activeWithinDays: [0, 7, 30, 90, 365].includes(period) ? period : 0,
       page: Math.max(1, Number(params.get("page") ?? 1) || 1),
+      privacyNotice: params.get("privacy") === "removed",
     });
     setHydrated(true);
   }, []);
@@ -187,6 +189,13 @@ export default function ContactsPage() {
           <p className="mt-1 text-xs text-muted">{hasFilters ? "contatos encontrados" : "contatos registrados"}</p>
         </div>
       </header>
+
+      {filters.privacyNotice && (
+        <div role="status" className="flex items-start justify-between gap-4 rounded-xl border border-success/20 bg-success/5 px-4 py-3 text-sm text-success">
+          <p>Os dados pessoais do contato foram anonimizados no ReplyFlow.</p>
+          <button type="button" onClick={() => setFilters((current) => ({ ...current, privacyNotice: false }))} className="shrink-0 font-semibold underline underline-offset-4">Fechar</button>
+        </div>
+      )}
 
       <section aria-label="Filtros de contatos" className="overflow-hidden rounded-2xl border border-border bg-white">
         <div className="border-b border-border bg-[#112620] px-4 py-4 text-white sm:px-5">

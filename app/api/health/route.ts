@@ -79,12 +79,12 @@ export async function GET() {
     {
       status: healthy ? "ok" : "degraded",
       checks: {
-        database,
-        redis,
-        queue,
-        worker,
+        database: { status: database.status },
+        redis: { status: redis.status },
+        queue: { status: queue.status },
+        worker: { status: worker.healthy ? "ok" : "error" },
       },
     },
-    { status: healthy ? 200 : 503 }
+    { status: healthy ? 200 : 503, headers: { "Cache-Control": "no-store" } }
   );
 }

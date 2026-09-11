@@ -1,5 +1,9 @@
 # Meta App Review notes
 
+> ReplyFlow: o ambiente de homologação e suas pendências estão em
+> [STAGING_INSTAGRAM.md](docs/STAGING_INSTAGRAM.md). Os testes automatizados
+> não comprovam aprovação da Meta ou entrega real de mensagens.
+
 You only need App Review if you want people who are not testers on your app to connect their own Instagram accounts. If you run OpenReply for your own accounts, skip this. See the "Letting other people use your instance" section of [docs/setup.md](docs/setup.md).
 
 OpenReply uses the official Instagram API to send a private reply to someone who comments on a connected professional account's post or reel.
@@ -9,6 +13,7 @@ OpenReply uses the official Instagram API to send a private reply to someone who
 - `instagram_business_basic`
 - `instagram_business_manage_comments`
 - `instagram_business_manage_messages`
+- `instagram_business_manage_insights` (requested by the current OAuth flow for performance reports)
 
 ## Permission justifications
 
@@ -21,6 +26,10 @@ Paste these into the App Review request, adjusted to your wording.
 `instagram_business_manage_messages`. After a follower comments a configured keyword, we send that follower a one-time private reply with content the account owner set up, typically a link or answer the follower asked for by commenting. This is the standard Instagram comment-to-DM flow. We send one reply per matching comment and respect Meta's rate limits.
 
 ## Screencast script
+
+For `instagram_business_manage_insights`, also show the connected account's
+performance report and the metrics retrieved from the official API. Request
+Advanced Access for the actual permission set used by the deployed version.
 
 Record on your published app, real accounts, one take, about two to three minutes. Narrate each step.
 

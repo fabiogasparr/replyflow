@@ -18,8 +18,12 @@
 # `@/lib/...` imports, because tsx has no tsconfig to resolve the alias
 # against, and no app/generated/prisma to import from).
 
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -29,14 +33,14 @@ COPY . .
 # generates app/generated/prisma AND compiles .next/ in one step.
 RUN npm run build
 
-FROM node:20-slim AS runner
+FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
 # scripts/cron.sh calls the /api/cron routes with wget, which node:20-slim does
 # not include.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends wget ca-certificates \
+ && apt-get install -y --no-install-recommends wget openssl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/node_modules ./node_modules

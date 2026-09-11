@@ -18,9 +18,12 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 const STATE_MAX_AGE_MS = 10 * 60 * 1000;
+export const INSTAGRAM_STATE_COOKIE = "replyflow-instagram-state";
 
 interface OAuthStatePayload {
   workspaceId: string;
+  userId: string;
+  nonce: string;
   ts: number;
 }
 
@@ -38,9 +41,9 @@ function signState(payload: string): string {
     .digest("base64url");
 }
 
-export function createOAuthState(workspaceId: string): string {
+export function createOAuthState(workspaceId: string, userId: string): string {
   const payload = base64UrlEncode(
-    JSON.stringify({ workspaceId, ts: Date.now() } satisfies OAuthStatePayload)
+    JSON.stringify({ workspaceId, userId, nonce: randomBytes(32).toString("hex"), ts: Date.now() } satisfies OAuthStatePayload)
   );
   return `${payload}.${signState(payload)}`;
 }
@@ -48,8 +51,8 @@ export function createOAuthState(workspaceId: string): string {
 export function verifyOAuthState(state: string | null): OAuthStatePayload | null {
   if (!state) return null;
 
-  const [payload, signature] = state.split(".");
-  if (!payload || !signature) return null;
+  const [payload, signature, extra] = state.split(".");
+  if (!payload || !signature || extra !== undefined) return null;
 
   const expected = signState(payload);
   const signatureBuffer = Buffer.from(signature);
@@ -64,7 +67,11 @@ export function verifyOAuthState(state: string | null): OAuthStatePayload | null
 
   try {
     const parsed = JSON.parse(base64UrlDecode(payload)) as OAuthStatePayload;
-    if (!parsed.workspaceId || Date.now() - parsed.ts > STATE_MAX_AGE_MS) {
+    if (!parsed || typeof parsed.workspaceId !== "string" || !parsed.workspaceId ||
+        typeof parsed.userId !== "string" || !parsed.userId ||
+        typeof parsed.nonce !== "string" || !/^[a-f0-9]{64}$/.test(parsed.nonce) ||
+        !Number.isFinite(parsed.ts) || parsed.ts > Date.now() ||
+        Date.now() - parsed.ts > STATE_MAX_AGE_MS) {
       return null;
     }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canManageInstagram, getCurrentWorkspaceContext } from "@/lib/workspace-access";
 import { getBaseUrl, getMissingInstagramOAuthEnv } from "@/lib/env";
-import { createOAuthState, getAuthorizationUrl } from "@/lib/meta/oauth";
+import { createOAuthState, getAuthorizationUrl, INSTAGRAM_STATE_COOKIE } from "@/lib/meta/oauth";
 
 export async function GET() {
   const context = await getCurrentWorkspaceContext();
@@ -25,7 +25,13 @@ export async function GET() {
   }
 
   const redirectUri = `${getBaseUrl()}/api/instagram/callback`;
-  const state = createOAuthState(context.workspaceId);
+  const state = createOAuthState(context.workspaceId, context.userId);
 
-  return NextResponse.redirect(getAuthorizationUrl(redirectUri, state));
+  const response = NextResponse.redirect(getAuthorizationUrl(redirectUri, state));
+  response.cookies.set(INSTAGRAM_STATE_COOKIE, state, {
+    httpOnly: true, secure: getBaseUrl().startsWith("https://"),
+    sameSite: "lax", path: "/api/instagram/callback", maxAge: 600,
+  });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }

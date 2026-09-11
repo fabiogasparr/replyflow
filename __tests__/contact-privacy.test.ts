@@ -35,6 +35,10 @@ const contact = {
   workspace: { id: "workspace_1", name: "Loja" },
   instagramAccount: { id: "account_1", username: "minhaloja" },
   conversations: [{ id: "conversation_1" }],
+  customFieldValues: [{
+    value: "São Paulo",
+    fieldDefinition: { id: "field_city", name: "Cidade", type: "TEXT", options: [], isActive: true },
+  }],
   _count: { conversations: 1 },
 };
 
@@ -84,7 +88,12 @@ describe("contact privacy export", () => {
         action: "CONTACT_DATA_EXPORTED",
         targetType: "Contact",
         targetId: "contact_1",
-        metadata: { interactionCount: 1, conversationCount: 1, processedCommentCount: 0 },
+        metadata: {
+          interactionCount: 1,
+          conversationCount: 1,
+          processedCommentCount: 0,
+          customFieldValueCount: 1,
+        },
       },
     });
     expect(result).toMatchObject({
@@ -92,6 +101,7 @@ describe("contact privacy export", () => {
       version: 1,
       contact: { id: "contact_1", username: "maria" },
       automationInteractions: [{ id: "log_1" }],
+      customFields: [{ value: "São Paulo" }],
     });
     expect(JSON.stringify(result)).not.toContain("accessToken");
   });

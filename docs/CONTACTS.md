@@ -41,11 +41,10 @@ Membros podem consultar os contatos. Proprietários e administradores podem edit
 - até 100 registros por página;
 - histórico limitado aos eventos já processados por automações.
 
-Conversas manuais, mensagens completas, cliques individualizados, campos personalizados, segmentos e exclusão/exportação de dados fazem parte das próximas entregas.
+Conversas manuais, mensagens completas, cliques individualizados e entidades próprias para etiquetas fazem parte das próximas entregas. Segmentos, campos personalizados e exportação/anonimização de dados já possuem módulos próprios documentados.
 
 ## Operação e rollback
 
 Antes de implantar, faça backup e execute `npm run db:migrate`. A migration é validada em schema isolado por `npm run test:contacts-db`, que aplica toda a sequência real de migrations e remove os dados de teste ao terminar.
 
 Para reverter o comportamento, publique primeiro uma versão da aplicação que não dependa da projeção. Depois, crie uma migration compensatória que remova o trigger `DmLog_sync_contact` e a função `sync_contact_from_dm_log`. Preserve a tabela `Contact` até exportar ou migrar anotações e etiquetas manuais. A exclusão direta da tabela causaria perda dessas informações.
-

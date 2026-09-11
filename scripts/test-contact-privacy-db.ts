@@ -51,7 +51,7 @@ async function main() {
 
     const migrations = (await readdir(path.join(projectRoot, "prisma/migrations")))
       .filter((name) => /^\d{14}_/.test(name)).sort();
-    assert.equal(migrations.at(-1), targetMigration, "A migration de privacidade deve ser a mais recente.");
+    assert.ok(migrations.includes(targetMigration), "A migration de privacidade não foi encontrada.");
     for (const name of migrations) await client.query(await migrationSql(name));
 
     await client.query(`

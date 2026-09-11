@@ -8,11 +8,14 @@ const { getCurrentWorkspaceContext, mockPrisma, transaction } = vi.hoisted(() =>
     instagramAccount: { findMany: vi.fn() },
     automation: { findMany: vi.fn() },
     dmLog: { findMany: vi.fn(), count: vi.fn() },
+    contactFieldDefinition: { findMany: vi.fn() },
     $queryRaw: vi.fn(),
     $transaction: vi.fn(),
   },
   transaction: {
     contact: { updateMany: vi.fn(), findFirst: vi.fn() },
+    contactFieldDefinition: { findMany: vi.fn() },
+    contactFieldValue: { updateMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     auditEvent: { create: vi.fn() },
   },
 }));
@@ -70,8 +73,13 @@ beforeEach(() => {
     .mockResolvedValueOnce([{ total: 0 }]);
   mockPrisma.dmLog.findMany.mockResolvedValue([]);
   mockPrisma.dmLog.count.mockResolvedValue(0);
+  mockPrisma.contactFieldDefinition.findMany.mockResolvedValue([]);
   transaction.contact.updateMany.mockResolvedValue({ count: 1 });
   transaction.contact.findFirst.mockResolvedValue({ ...contact, version: 3 });
+  transaction.contactFieldDefinition.findMany.mockResolvedValue([]);
+  transaction.contactFieldValue.updateMany.mockResolvedValue({ count: 0 });
+  transaction.contactFieldValue.create.mockResolvedValue({ id: "value_1" });
+  transaction.contactFieldValue.deleteMany.mockResolvedValue({ count: 0 });
   transaction.auditEvent.create.mockResolvedValue({ id: "audit_1" });
   mockPrisma.$transaction.mockImplementation(
     async (callback: (client: typeof transaction) => unknown) => callback(transaction)
@@ -195,6 +203,7 @@ describe("contacts authorization and scoped reads", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: {
         contact: { id: "contact_1", notes: "Retornar amanhã", version: 2 },
+        customFields: [],
         canEdit: true,
         canExport: true,
         canErase: false,
@@ -204,6 +213,10 @@ describe("contacts authorization and scoped reads", () => {
       where: { id: "contact_1", workspaceId: "workspace_1", instagramAccount: { workspaceId: "workspace_1" } },
       select: expect.objectContaining({ notes: true, instagramAccount: { select: { id: true, username: true } } }),
     }));
+    expect(mockPrisma.contactFieldDefinition.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { workspaceId: "workspace_1", isActive: true },
+    }));
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("returns 404 for a contact outside the workspace and never reads its interactions", async () => {
@@ -299,6 +312,103 @@ describe("contact editing and audit", () => {
     expect(transaction.auditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ metadata: { fields: ["notes"] } }),
     }));
+  });
+
+  it("validates and saves workspace-owned custom fields in the same versioned transaction", async () => {
+    transaction.contactFieldDefinition.findMany.mockResolvedValue([
+      { id: "field_budget", type: "NUMBER", options: [] },
+      { id: "field_stage", type: "SELECT", options: ["Novo", "Cliente"] },
+    ]);
+
+    const response = await PATCH(request("/contact_1", {
+      version: 2,
+      customFields: [
+        { fieldDefinitionId: "field_budget", value: "1500,50" },
+        { fieldDefinitionId: "field_stage", value: "Cliente" },
+      ],
+    }), route());
+
+    expect(response.status).toBe(200);
+    expect(transaction.contactFieldDefinition.findMany).toHaveBeenCalledWith({
+      where: {
+        workspaceId: "workspace_1",
+        isActive: true,
+        id: { in: ["field_budget", "field_stage"] },
+      },
+      select: { id: true, type: true, options: true },
+    });
+    expect(transaction.contactFieldValue.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { workspaceId: "workspace_1", contactId: "contact_1", fieldDefinitionId: "field_budget" },
+      data: { value: "1500.5" },
+    });
+    expect(transaction.contactFieldValue.create).toHaveBeenNthCalledWith(1, {
+      data: {
+        workspaceId: "workspace_1", contactId: "contact_1",
+        fieldDefinitionId: "field_budget", value: "1500.5",
+      },
+    });
+    expect(transaction.contactFieldValue.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        workspaceId: "workspace_1", contactId: "contact_1",
+        fieldDefinitionId: "field_stage", value: "Cliente",
+      },
+    });
+    expect(transaction.auditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metadata: { fields: ["customFields"], customFieldIds: ["field_budget", "field_stage"] },
+      }),
+    }));
+    await expect(response.json()).resolves.toMatchObject({
+      data: { customFields: [{ value: "1500.5" }, { value: "Cliente" }] },
+    });
+  });
+
+  it("clears an empty custom field without creating an empty value", async () => {
+    transaction.contactFieldDefinition.findMany.mockResolvedValue([
+      { id: "field_city", type: "TEXT", options: [] },
+    ]);
+    const response = await PATCH(request("/contact_1", {
+      version: 2,
+      customFields: [{ fieldDefinitionId: "field_city", value: "   " }],
+    }), route());
+    expect(response.status).toBe(200);
+    expect(transaction.contactFieldValue.deleteMany).toHaveBeenCalledWith({
+      where: { workspaceId: "workspace_1", contactId: "contact_1", fieldDefinitionId: "field_city" },
+    });
+    expect(transaction.contactFieldValue.updateMany).not.toHaveBeenCalled();
+    expect(transaction.contactFieldValue.create).not.toHaveBeenCalled();
+  });
+
+  it("updates an existing custom value through a fully scoped mutation", async () => {
+    transaction.contactFieldDefinition.findMany.mockResolvedValue([
+      { id: "field_city", type: "TEXT", options: [] },
+    ]);
+    transaction.contactFieldValue.updateMany.mockResolvedValue({ count: 1 });
+
+    const response = await PATCH(request("/contact_1", {
+      version: 2,
+      customFields: [{ fieldDefinitionId: "field_city", value: "Recife" }],
+    }), route());
+
+    expect(response.status).toBe(200);
+    expect(transaction.contactFieldValue.updateMany).toHaveBeenCalledWith({
+      where: { workspaceId: "workspace_1", contactId: "contact_1", fieldDefinitionId: "field_city" },
+      data: { value: "Recife" },
+    });
+    expect(transaction.contactFieldValue.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects foreign, inactive or invalid custom fields before updating the contact", async () => {
+    transaction.contactFieldDefinition.findMany.mockResolvedValue([]);
+    const response = await PATCH(request("/contact_1", {
+      version: 2,
+      customFields: [{ fieldDefinitionId: "foreign_field", value: "Segredo" }],
+    }), route());
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: "INVALID_CONTACT_FIELD_VALUE" });
+    expect(transaction.contact.updateMany).not.toHaveBeenCalled();
+    expect(transaction.contactFieldValue.updateMany).not.toHaveBeenCalled();
+    expect(transaction.contactFieldValue.create).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { contactFieldValuesSchema, type ContactCustomField } from "@/lib/contact-custom-fields";
 
 export const CONTACT_PAGE_SIZE = 25;
 export const CONTACT_MAX_PAGE_SIZE = 100;
@@ -46,6 +47,7 @@ export type ContactsListData = {
 
 export type ContactDetailData = {
   contact: ContactDetail;
+  customFields: ContactCustomField[];
   canEdit: boolean;
   canExport: boolean;
   canErase: boolean;
@@ -84,8 +86,9 @@ export const updateContactSchema = z.strictObject({
     }).optional(),
   notes: z.string().max(CONTACT_MAX_NOTES_LENGTH).trim().nullable()
     .transform((notes) => notes || null).optional(),
-}).refine((input) => input.tags !== undefined || input.notes !== undefined, {
-  message: "Informe etiquetas ou anotações para atualizar o contato.",
+  customFields: contactFieldValuesSchema.optional(),
+}).refine((input) => input.tags !== undefined || input.notes !== undefined || input.customFields !== undefined, {
+  message: "Informe etiquetas, anotações ou campos personalizados para atualizar o contato.",
 });
 
 // Explicit selections keep notes out of lists and account credentials out of all responses.

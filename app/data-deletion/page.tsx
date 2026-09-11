@@ -12,7 +12,7 @@ export default function DataDeletionPage() {
     <LegalShell
       title="Exclusão de Dados"
       description="Use esta página para solicitar a remoção de dados de conta, espaço de trabalho, Instagram e campanhas do ReplyFlow."
-      updatedAt="4 de setembro de 2026"
+      updatedAt="11 de setembro de 2026"
     >
       <section>
         <h2 className="text-xl font-bold text-foreground">Desconectar o Instagram</h2>
@@ -20,6 +20,18 @@ export default function DataDeletionPage() {
           Entre na plataforma, abra Configurações e selecione Desconectar. Isso remove
           o token armazenado da conexão com o Instagram e interrompe os envios de
           respostas privadas para esse espaço de trabalho.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-bold text-foreground">Dados de um contato</h2>
+        <p className="mt-3">
+          Proprietários e administradores podem exportar os dados de um contato pelo
+          perfil. A anonimização permanente fica disponível ao proprietário e remove
+          do ReplyFlow o perfil, as anotações, as conversas locais e o conteúdo
+          diretamente identificável dos registros de automação. Datas, resultados e
+          IDs técnicos de deduplicação podem ser mantidos para evitar reenvios e
+          preservar métricas operacionais, conforme a política de retenção aplicável.
         </p>
       </section>
 
@@ -39,6 +51,11 @@ export default function DataDeletionPage() {
           profissional conectada antes da exclusão. Pedidos são processados assim que
           possível, salvo quando a retenção for necessária por motivos legais, de
           cobrança, prevenção a fraude ou segurança.
+        </p>
+        <p className="mt-3">
+          A remoção no ReplyFlow não exclui automaticamente dados mantidos pela Meta.
+          Quando aplicável, o controlador deve tratar também a solicitação pelos canais
+          próprios do Instagram.
         </p>
       </section>
     </LegalShell>

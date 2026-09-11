@@ -193,7 +193,12 @@ describe("contacts authorization and scoped reads", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      data: { contact: { id: "contact_1", notes: "Retornar amanhã", version: 2 }, canEdit: true },
+      data: {
+        contact: { id: "contact_1", notes: "Retornar amanhã", version: 2 },
+        canEdit: true,
+        canExport: true,
+        canErase: false,
+      },
     });
     expect(mockPrisma.contact.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "contact_1", workspaceId: "workspace_1", instagramAccount: { workspaceId: "workspace_1" } },

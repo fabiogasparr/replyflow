@@ -30,6 +30,8 @@ const actionLabels: Record<string, string> = {
   INSTAGRAM_CONNECTED: "conectou uma conta do Instagram",
   INSTAGRAM_DISCONNECTED: "desconectou uma conta do Instagram",
   CONTACT_UPDATED: "atualizou um contato",
+  CONTACT_DATA_EXPORTED: "exportou os dados de um contato",
+  CONTACT_DATA_ANONYMIZED: "anonimizou os dados de um contato",
   CONVERSATION_UPDATED: "organizou uma conversa",
   CONVERSATION_MESSAGE_SENT: "respondeu uma conversa",
   DM_RETRY_REQUESTED: "solicitou o reprocessamento de um envio",

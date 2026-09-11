@@ -44,7 +44,12 @@ export type ContactsListData = {
   canEdit: boolean;
 };
 
-export type ContactDetailData = { contact: ContactDetail; canEdit: boolean };
+export type ContactDetailData = {
+  contact: ContactDetail;
+  canEdit: boolean;
+  canExport: boolean;
+  canErase: boolean;
+};
 
 export type ContactInteractionsData = {
   interactions: ContactInteraction[];

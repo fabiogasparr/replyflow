@@ -16,6 +16,8 @@ export const AUDIT_ACTIONS = {
   instagramConnected: "INSTAGRAM_CONNECTED",
   instagramDisconnected: "INSTAGRAM_DISCONNECTED",
   contactUpdated: "CONTACT_UPDATED",
+  contactDataExported: "CONTACT_DATA_EXPORTED",
+  contactDataAnonymized: "CONTACT_DATA_ANONYMIZED",
   conversationUpdated: "CONVERSATION_UPDATED",
   conversationMessageSent: "CONVERSATION_MESSAGE_SENT",
   dmRetryRequested: "DM_RETRY_REQUESTED",

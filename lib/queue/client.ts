@@ -56,6 +56,9 @@ export interface ProcessPostbackJob {
   payload: string;
   mid?: string;
   fallback?: boolean;
+  // Scheduled follow re-check (lib/audience/follow-recheck): deliver the link
+  // if the person now follows, otherwise stay silent.
+  autoRecheck?: boolean;
 }
 
 // Scheduled after the link is delivered, to send the appreciation follow-up.

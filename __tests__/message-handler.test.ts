@@ -37,6 +37,10 @@ vi.mock("@/lib/utils/keyword-matcher", () => ({
 }));
 vi.mock("@/lib/meta/client", () => ({
   getUserFollowStatus: mocks.getUserFollowStatus,
+  getUserFollowProfile: async (token: string, id: string) => ({
+    follows: await mocks.getUserFollowStatus(token, id),
+    followedBy: null,
+  }),
   sendDirectMessageWithButton: mocks.sendDirectMessageWithButton,
 }));
 vi.mock("@/lib/billing/usage", () => ({
@@ -49,6 +53,7 @@ vi.mock("@/lib/automations/operational-state", () => ({
 }));
 vi.mock("@/lib/queue/client", () => ({
   FOLLOWUP_JOB_NAME: "process-followup",
+  POSTBACK_JOB_NAME: "process-postback",
   MESSAGE_JOB_NAME: "process-message",
 getDMQueue: () => ({ add: mocks.queueAdd }),
 }));
@@ -174,7 +179,16 @@ describe("inbound message queue handler", () => {
       "followcheck:automation_1"
     );
     expect(mocks.sendRevealDirectMessage).not.toHaveBeenCalled();
-    expect(mocks.queueAdd).not.toHaveBeenCalled();
+    // No follow-up is scheduled (no link went out) — only the automatic
+    // follow re-checks that deliver the link once the person follows.
+    expect(
+      mocks.queueAdd.mock.calls.filter(([name]) => name === "process-followup")
+    ).toHaveLength(0);
+    expect(
+      mocks.queueAdd.mock.calls.filter(
+        ([, data]) => (data as { autoRecheck?: boolean }).autoRecheck
+      )
+    ).toHaveLength(2);
   });
 
   it("records the attempt, delivers the reveal and schedules the follow-up", async () => {

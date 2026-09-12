@@ -1,7 +1,6 @@
 import type { Job } from "bullmq";
 import { prisma } from "@/lib/db/client";
 import {
-  getUserFollowStatus,
   sendCommentReply,
   sendPrivateReply,
   sendPrivateReplyWithButton,
@@ -27,6 +26,11 @@ import {
   resolveMessageText,
   waitForSendSlot,
 } from "@/lib/messaging/pacing";
+import {
+  checkAndRecordFollowStatus,
+  pickAudienceDmTemplate,
+} from "@/lib/audience/follow-status";
+import { scheduleFollowRechecks } from "@/lib/audience/follow-recheck";
 import {
   assessComment,
   generatePersonalizedDm,
@@ -591,18 +595,38 @@ export async function processComment(
     // status at comment time: confirmed followers get the link now, everyone
     // else gets the "follow me first" prompt (re-verified on tap).
     let sendFollowPrompt = false;
+    let follows: boolean | null = null;
+    let followChecked = false;
+    const verifyFollow = async () => {
+      if (!followChecked) {
+        followChecked = true;
+        follows = (
+          await checkAndRecordFollowStatus({
+            accessToken,
+            workspaceId: automation.workspaceId,
+            instagramAccountId: automation.instagramAccountId,
+            userId: commenterId,
+          })
+        ).follows;
+      }
+      return follows;
+    };
     if (automation.requireFollow && !useOpeningDm) {
-      const alreadyFollows = await getUserFollowStatus(accessToken, commenterId);
-      sendFollowPrompt = alreadyFollows !== true;
+      sendFollowPrompt = (await verifyFollow()) !== true;
+    }
+    // Audience wording needs the status even without a follow gate.
+    if (automation.audienceDmEnabled && !useOpeningDm && !sendFollowPrompt) {
+      await verifyFollow();
     }
 
     // Pick this send's wording (variation list + spintax) before touching Meta.
+    const audienceTemplate = pickAudienceDmTemplate(automation, follows);
     const templateDmText =
       (await resolveMessageText(
         automation.id,
         "dm",
-        automation.dmMessage,
-        automation.dmMessages
+        audienceTemplate ?? automation.dmMessage,
+        audienceTemplate ? [] : automation.dmMessages
       )) ?? automation.dmMessage;
     const dmText =
       automation.aiDmEnabled && !useOpeningDm && !sendFollowPrompt
@@ -671,6 +695,12 @@ export async function processComment(
             DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
           `followcheck:${automation.id}`
         );
+        // Re-verify on our own later: people often follow and never tap again.
+        await scheduleFollowRechecks({
+          instagramAccountId: automation.instagramAccount.instagramId,
+          userId: commenterId,
+          automationId: automation.id,
+        }).catch(() => {});
       } else if (automation.trackedLinks.length > 0) {
         // Try button template first; if Meta rejects it, fall back to inline links.
         const bodyText =

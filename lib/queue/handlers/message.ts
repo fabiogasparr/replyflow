@@ -1,9 +1,11 @@
 import type { Job } from "bullmq";
 import { prisma } from "@/lib/db/client";
+import { sendDirectMessageWithButton } from "@/lib/meta/client";
 import {
-  getUserFollowStatus,
-  sendDirectMessageWithButton,
-} from "@/lib/meta/client";
+  checkAndRecordFollowStatus,
+  pickAudienceDmTemplate,
+} from "@/lib/audience/follow-status";
+import { scheduleFollowRechecks } from "@/lib/audience/follow-recheck";
 import { decryptToken } from "@/lib/meta/oauth";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
 import {
@@ -336,8 +338,18 @@ export async function processMessage(
     // the user has already claimed to follow; here it would hand the link to
     // anyone whose status the API happens not to resolve.
     let sendFollowPrompt = false;
+    let follows: boolean | null = null;
+    if (automation.requireFollow || automation.audienceDmEnabled) {
+      follows = (
+        await checkAndRecordFollowStatus({
+          accessToken,
+          workspaceId: automation.workspaceId,
+          instagramAccountId: automation.instagramAccountId,
+          userId: senderId,
+        })
+      ).follows;
+    }
     if (automation.requireFollow) {
-      const follows = await getUserFollowStatus(accessToken, senderId);
       sendFollowPrompt = follows !== true;
     }
 
@@ -417,12 +429,13 @@ export async function processMessage(
           automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE
         )) ?? DEFAULT_FOLLOW_PROMPT_MESSAGE)
       : null;
+    const audienceTemplate = pickAudienceDmTemplate(automation, follows);
     const templateDmText =
       (await resolveMessageText(
         automation.id,
         "dm",
-        automation.dmMessage,
-        automation.dmMessages
+        audienceTemplate ?? automation.dmMessage,
+        audienceTemplate ? [] : automation.dmMessages
       )) ?? automation.dmMessage;
     const dmText =
       automation.aiDmEnabled && !sendFollowPrompt
@@ -476,6 +489,11 @@ export async function processMessage(
             DEFAULT_FOLLOW_PROMPT_BUTTON_LABEL,
           `followcheck:${automation.id}`
         );
+        await scheduleFollowRechecks({
+          instagramAccountId: automation.instagramAccount.instagramId,
+          userId: senderId,
+          automationId: automation.id,
+        }).catch(() => {});
       } else {
         await sendRevealDirectMessage(
           accessToken,

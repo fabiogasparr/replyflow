@@ -23,8 +23,24 @@ describe("contact segment contract", () => {
       automationId: "",
       origin: "",
       engagement: "",
+      follow: "",
       activeWithinDays: 0,
     });
+  });
+
+  it("segments followers, non-followers and unverified contacts", () => {
+    const sqlFor = (follow: string) =>
+      queryText(
+        buildContactSegmentQueries({
+          workspaceId: "workspace_1",
+          filters: parse({ follow }),
+        }).ids
+      );
+    expect(sqlFor("FOLLOWERS")).toContain('contact."followsAccount" = TRUE');
+    expect(sqlFor("NON_FOLLOWERS")).toContain('contact."followsAccount" = FALSE');
+    expect(sqlFor("UNKNOWN")).toContain('contact."followsAccount" IS NULL');
+    expect(sqlFor("")).not.toContain("followsAccount");
+    expect(contactSegmentFiltersSchema.safeParse({ follow: "FRIENDS" }).success).toBe(false);
   });
 
   it.each([

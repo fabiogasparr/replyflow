@@ -271,6 +271,12 @@ model Contact {
   username           String?
   usernameObservedAt DateTime?
   tags               String[]  @default([])
+  // Relationship with the account as last verified through the messaging
+  // profile (is_user_follow_business / is_business_follow_user). Null = never
+  // checked or Meta did not return it.
+  followsAccount        Boolean?
+  followedByAccount     Boolean?
+  followStatusCheckedAt DateTime?
   notes              String?
   /// Optimistic concurrency token changed only by manual edits.
   version            Int       @default(0)
@@ -289,6 +295,7 @@ model Contact {
   @@unique([id, workspaceId, instagramAccountId])
   @@index([workspaceId, lastSeenAt])
   @@index([workspaceId, instagramAccountId, lastSeenAt])
+  @@index([workspaceId, followsAccount])
 }
 
 /// Workspace-owned schema for structured CRM data. Definitions are soft-
@@ -439,6 +446,12 @@ model Automation {
   requireFollow           Boolean   @default(false)
   followPromptMessage     String?
   followPromptButtonLabel String?
+  // Audience-specific link DM: when enabled the worker checks whether the
+  // person follows the account and uses the matching wording (falls back to
+  // dmMessage when a text is empty or the status cannot be verified).
+  audienceDmEnabled       Boolean   @default(false)
+  followerDmMessage       String?
+  nonFollowerDmMessage    String?
   followUpEnabled         Boolean   @default(false)
   followUpMessage         String?
   // Minutes to wait after the link is delivered before sending the follow-up.

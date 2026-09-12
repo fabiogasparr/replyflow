@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   dmLogUpsert: vi.fn(),
   dmLogUpdateMany: vi.fn(),
   operationalEventCreate: vi.fn(),
+  getUserFollowProfile: vi.fn(),
   decryptToken: vi.fn(),
   matchKeywords: vi.fn(),
   reserveDMSlot: vi.fn(),
@@ -56,12 +57,14 @@ vi.mock("@/lib/automations/operational-state", () => ({
 }));
 vi.mock("@/lib/meta/client", () => ({
   getUserFollowStatus: vi.fn(),
+  getUserFollowProfile: mocks.getUserFollowProfile,
   sendCommentReply: mocks.sendCommentReply,
   sendPrivateReply: mocks.sendPrivateReply,
   sendPrivateReplyWithButton: mocks.sendPrivateReplyWithButton,
   sendPrivateReplyWithLinkButton: mocks.sendPrivateReplyWithLinkButton,
 }));
 vi.mock("@/lib/queue/client", () => ({
+  POSTBACK_JOB_NAME: "process-postback",
   getDMQueue: () => ({ add: mocks.queueAdd }),
 }));
 const ai = vi.hoisted(() => ({
@@ -155,6 +158,7 @@ beforeEach(() => {
   mocks.reserveDMSlot.mockResolvedValue({ allowed: true });
   mocks.sendPrivateReply.mockResolvedValue({ message_id: "sent_1" });
   mocks.operationalEventCreate.mockResolvedValue({});
+  mocks.getUserFollowProfile.mockResolvedValue({ follows: null, followedBy: null });
   ai.assessComment.mockResolvedValue(null);
   ai.generatePersonalizedPublicReply.mockResolvedValue(null);
   ai.generatePersonalizedDm.mockResolvedValue(null);
@@ -437,6 +441,52 @@ describe("comment queue handler", () => {
       "business_1",
       "comment_1",
       "Modelo Bia"
+    );
+  });
+
+  it("schedules automatic follow re-checks after sending the follow prompt", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, requireFollow: true },
+    ]);
+    mocks.getUserFollowProfile.mockResolvedValue({ follows: false, followedBy: null });
+    mocks.sendPrivateReplyWithButton.mockResolvedValue({});
+
+    await processComment(job());
+
+    expect(mocks.sendPrivateReplyWithButton).toHaveBeenCalledWith(
+      "plain-token",
+      "business_1",
+      "comment_1",
+      expect.any(String),
+      expect.any(String),
+      "followcheck:automation_1"
+    );
+    const recheckJobs = mocks.queueAdd.mock.calls.filter(
+      ([, data]) => (data as { autoRecheck?: boolean }).autoRecheck
+    );
+    expect(recheckJobs).toHaveLength(2);
+    expect(recheckJobs[0][2]).toMatchObject({ jobId: "followrecheck_automation_1_person_1_10" });
+  });
+
+  it("uses the non-follower wording when audience messages are enabled", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      {
+        ...configuredAutomation,
+        audienceDmEnabled: true,
+        followerDmMessage: "Valeu por seguir, {username}!",
+        nonFollowerDmMessage: "Oi {username}, segue a gente 😉",
+      },
+    ]);
+    mocks.getUserFollowProfile.mockResolvedValue({ follows: false, followedBy: null });
+
+    await processComment(job());
+
+    expect(mocks.getUserFollowProfile).toHaveBeenCalledWith("plain-token", "person_1");
+    expect(mocks.sendPrivateReply).toHaveBeenCalledWith(
+      "plain-token",
+      "business_1",
+      "comment_1",
+      "Oi Bia, segue a gente 😉"
     );
   });
 });

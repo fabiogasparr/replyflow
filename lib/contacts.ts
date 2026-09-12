@@ -15,6 +15,9 @@ export type ContactSummary = {
   instagramScopedId: string;
   username: string | null;
   tags: string[];
+  followsAccount: boolean | null;
+  followedByAccount: boolean | null;
+  followStatusCheckedAt: string | null;
   version: number;
   firstSeenAt: string;
   lastSeenAt: string;
@@ -98,6 +101,9 @@ export const contactSummarySelect = {
   instagramScopedId: true,
   username: true,
   tags: true,
+  followsAccount: true,
+  followedByAccount: true,
+  followStatusCheckedAt: true,
   version: true,
   firstSeenAt: true,
   lastSeenAt: true,

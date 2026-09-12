@@ -64,6 +64,10 @@ vi.mock("@/lib/meta/client", () => ({
   sendPrivateReplyWithLinkButton: mockSendPrivateReplyWithLinkButton,
   sendPrivateReplyWithButton: mockSendPrivateReplyWithButton,
   getUserFollowStatus: mockGetUserFollowStatus,
+  getUserFollowProfile: async (token: string, id: string) => ({
+    follows: await mockGetUserFollowStatus(token, id),
+    followedBy: null,
+  }),
   sendDirectMessageWithButton: mockSendDirectMessageWithButton,
   sendDirectMessage: mockSendDirectMessage,
   sendDirectMessageWithLinkButton: mockSendDirectMessageWithLinkButton,

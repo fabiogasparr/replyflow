@@ -10,6 +10,8 @@ export const contactSegmentFiltersSchema = contactFiltersSchema.extend({
   engagement: z
     .enum(["", "SENT", "FAILED", "PENDING", "SKIPPED"])
     .default(""),
+  // Follower relationship as last verified by the worker (Contact.followsAccount).
+  follow: z.enum(["", "FOLLOWERS", "NON_FOLLOWERS", "UNKNOWN"]).default(""),
   activeWithinDays: z.coerce
     .number()
     .int()
@@ -94,6 +96,13 @@ export function buildContactSegmentQueries(input: {
       STRPOS(LOWER(COALESCE(contact."username", '')), LOWER(${usernameSearch})) > 0
       OR STRPOS(contact."instagramScopedId", ${filters.search}) > 0
     )`);
+  }
+  if (filters.follow === "FOLLOWERS") {
+    clauses.push(Prisma.sql`contact."followsAccount" = TRUE`);
+  } else if (filters.follow === "NON_FOLLOWERS") {
+    clauses.push(Prisma.sql`contact."followsAccount" = FALSE`);
+  } else if (filters.follow === "UNKNOWN") {
+    clauses.push(Prisma.sql`contact."followsAccount" IS NULL`);
   }
   if (filters.activeWithinDays > 0) {
     const cutoff = new Date(

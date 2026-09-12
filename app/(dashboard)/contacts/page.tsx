@@ -23,6 +23,7 @@ const emptyFilters = {
   automation: "",
   origin: "",
   engagement: "",
+  follow: "",
   activeWithinDays: 0,
   page: 1,
   privacyNotice: false,
@@ -39,6 +40,7 @@ function filtersToParams(filters: ContactFilters) {
   if (filters.automation) params.set("automationId", filters.automation);
   if (filters.origin) params.set("origin", filters.origin);
   if (filters.engagement) params.set("engagement", filters.engagement);
+  if (filters.follow) params.set("follow", filters.follow);
   if (filters.activeWithinDays) {
     params.set("activeWithinDays", String(filters.activeWithinDays));
   }
@@ -66,6 +68,7 @@ export default function ContactsPage() {
       automation: params.get("automationId") ?? "",
       origin: params.get("origin") ?? "",
       engagement: params.get("engagement") ?? "",
+      follow: params.get("follow") ?? "",
       activeWithinDays: [0, 7, 30, 90, 365].includes(period) ? period : 0,
       page: Math.max(1, Number(params.get("page") ?? 1) || 1),
       privacyNotice: params.get("privacy") === "removed",
@@ -131,6 +134,7 @@ export default function ContactsPage() {
       filters.automation ||
       filters.origin ||
       filters.engagement ||
+      filters.follow ||
       filters.activeWithinDays
   );
   const availableAutomations = useMemo(
@@ -159,6 +163,9 @@ export default function ContactsPage() {
     if (filters.engagement === "FAILED") chips.push("Entrega com falha");
     if (filters.engagement === "PENDING") chips.push("Entrega pendente");
     if (filters.engagement === "SKIPPED") chips.push("Envio não realizado");
+    if (filters.follow === "FOLLOWERS") chips.push("Segue o perfil");
+    if (filters.follow === "NON_FOLLOWERS") chips.push("Não segue o perfil");
+    if (filters.follow === "UNKNOWN") chips.push("Relação não verificada");
     if (filters.activeWithinDays) {
       chips.push(`Ativo nos últimos ${filters.activeWithinDays} dias`);
     }
@@ -258,6 +265,15 @@ export default function ContactsPage() {
               <option value="SKIPPED">Envio não realizado</option>
             </select>
           </label>
+          <label className="space-y-2 text-xs font-semibold text-foreground" htmlFor="contact-follow">
+            <span>Relação com o perfil</span>
+            <select id="contact-follow" value={filters.follow} onChange={(event) => changeFilters({ follow: event.target.value })} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-normal outline-none focus:border-accent">
+              <option value="">Seguidores e não seguidores</option>
+              <option value="FOLLOWERS">Segue o perfil</option>
+              <option value="NON_FOLLOWERS">Não segue o perfil</option>
+              <option value="UNKNOWN">Ainda não verificado</option>
+            </select>
+          </label>
           <label className="space-y-2 text-xs font-semibold text-foreground" htmlFor="contact-period">
             <span>Última atividade</span>
             <select id="contact-period" value={filters.activeWithinDays} onChange={(event) => changeFilters({ activeWithinDays: Number(event.target.value) })} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-normal outline-none focus:border-accent">
@@ -314,7 +330,11 @@ export default function ContactsPage() {
                       <ContactAvatar username={contact.username} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold group-hover:text-success">{contact.username ? `@${contact.username}` : "Contato sem nome"}</p>
-                        <p className="mt-1 truncate text-xs text-muted">{contact.username ? "Ver perfil do contato" : `ID ${contact.instagramScopedId}`}</p>
+                        <p className="mt-1 truncate text-xs text-muted">
+                          {contact.followsAccount === true && <span className="mr-2 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">Segue</span>}
+                          {contact.followsAccount === false && <span className="mr-2 rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-semibold text-warning">Não segue</span>}
+                          {contact.username ? "Ver perfil do contato" : `ID ${contact.instagramScopedId}`}
+                        </p>
                       </div>
                     </div>
                     <div className="min-w-0"><span className="mr-2 text-xs text-muted lg:hidden">Conta:</span><span className="break-words text-sm">@{contact.instagramAccount.username}</span></div>

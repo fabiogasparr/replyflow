@@ -1,9 +1,10 @@
 import type { Job } from "bullmq";
 import { prisma } from "@/lib/db/client";
+import { sendDirectMessageWithButton } from "@/lib/meta/client";
 import {
-  getUserFollowStatus,
-  sendDirectMessageWithButton,
-} from "@/lib/meta/client";
+  checkAndRecordFollowStatus,
+  pickAudienceDmTemplate,
+} from "@/lib/audience/follow-status";
 import { decryptToken } from "@/lib/meta/oauth";
 import {
   releaseWorkspaceDMReservation,
@@ -43,7 +44,12 @@ import {
 export async function processPostback(
   job: Job<ProcessPostbackJob>
 ): Promise<void> {
-  const { instagramAccountId, userId, payload, fallback } = job.data;
+  const { instagramAccountId, userId, payload } = job.data;
+  // Both the read fallback and the scheduled follow re-check are speculative
+  // deliveries: silent when the person does not qualify, and never logged as
+  // a failure when the messaging window has closed.
+  const fallback = Boolean(job.data.fallback || job.data.autoRecheck);
+  const autoRecheck = Boolean(job.data.autoRecheck);
 
   const isFollowCheck = payload.startsWith("followcheck:");
   if (!isFollowCheck && !payload.startsWith("reveal:")) return;
@@ -122,8 +128,24 @@ export async function processPostback(
   // be bypassable by just reading the DM and waiting. Following, or
   // unverifiable (null), falls through and delivers the link — fail-open so a
   // real follower is never trapped.
+  let follows: boolean | null = null;
+  if (
+    ((isFollowCheck || fallback) && automation.requireFollow) ||
+    automation.audienceDmEnabled
+  ) {
+    follows = (
+      await checkAndRecordFollowStatus({
+        accessToken,
+        workspaceId: automation.workspaceId,
+        instagramAccountId: automation.instagramAccountId,
+        userId,
+      })
+    ).follows;
+  }
   if ((isFollowCheck || fallback) && automation.requireFollow) {
-    const follows = await getUserFollowStatus(accessToken, userId);
+    // A scheduled re-check only acts on a confirmed follow; "unknown" is not
+    // enough to hand out the link without the person asking again.
+    if (autoRecheck && follows !== true) return;
     if (follows === false) {
       if (fallback) return;
       const promptText = renderMessageWithoutLink({
@@ -220,12 +242,13 @@ export async function processPostback(
     return;
   }
 
+  const audienceTemplate = pickAudienceDmTemplate(automation, follows);
   const dmText =
     (await resolveMessageText(
       automation.id,
       "dm",
-      automation.dmMessage,
-      automation.dmMessages
+      audienceTemplate ?? automation.dmMessage,
+      audienceTemplate ? [] : automation.dmMessages
     )) ?? automation.dmMessage;
 
   try {

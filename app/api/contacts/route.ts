@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     automationId: params.get("automationId") ?? undefined,
     origin: params.get("origin") ?? undefined,
     engagement: params.get("engagement") ?? undefined,
+    follow: params.get("follow") ?? undefined,
     activeWithinDays: params.get("activeWithinDays") ?? undefined,
   });
   if (!parsed.success) {

@@ -65,6 +65,9 @@ interface LoadedCampaign {
   requireFollow: boolean;
   followPromptMessage: string | null;
   followPromptButtonLabel: string | null;
+  audienceDmEnabled?: boolean;
+  followerDmMessage?: string | null;
+  nonFollowerDmMessage?: string | null;
   followUpEnabled: boolean;
   followUpMessage: string | null;
   followUpDelayMinutes: number | null;
@@ -226,6 +229,9 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
   const [followPromptMessage, setFollowPromptMessage] = useState("");
   const [followPromptButtonLabel, setFollowPromptButtonLabel] =
     useState("Já estou seguindo");
+  const [audienceDmEnabled, setAudienceDmEnabled] = useState(false);
+  const [followerDmMessage, setFollowerDmMessage] = useState("");
+  const [nonFollowerDmMessage, setNonFollowerDmMessage] = useState("");
   const [followUpEnabled, setFollowUpEnabled] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState("");
   const [followUpDelayMinutes, setFollowUpDelayMinutes] = useState(0);
@@ -362,6 +368,9 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         setFollowPromptButtonLabel(
           c.followPromptButtonLabel ?? "Já estou seguindo"
         );
+        setAudienceDmEnabled(c.audienceDmEnabled ?? false);
+        setFollowerDmMessage(c.followerDmMessage ?? "");
+        setNonFollowerDmMessage(c.nonFollowerDmMessage ?? "");
         setFollowUpEnabled(c.followUpEnabled ?? false);
         setFollowUpMessage(c.followUpMessage ?? "");
         setFollowUpDelayMinutes(c.followUpDelayMinutes ?? 0);
@@ -784,6 +793,9 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       followPromptButtonLabel: requireFollow
         ? followPromptButtonLabel.trim() || "Já estou seguindo"
         : "",
+      audienceDmEnabled,
+      followerDmMessage: audienceDmEnabled ? followerDmMessage.trim() || null : null,
+      nonFollowerDmMessage: audienceDmEnabled ? nonFollowerDmMessage.trim() || null : null,
       followUpEnabled,
       followUpMessage: followUpEnabled ? followUpMessage.trim() : "",
       followUpDelayMinutes: followUpEnabled ? followUpDelayMinutes : 0,
@@ -1391,7 +1403,9 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 <p className="text-xs text-muted">
                   Enviamos o link depois que a pessoa tocar no botão e o Instagram
                   confirmar que ela segue o perfil. Se não for possível verificar,
-                  o link será enviado mesmo assim.
+                  o link será enviado mesmo assim. Também rechecamos sozinhos 10
+                  minutos e 1 hora depois do pedido: quem seguiu e não tocou de
+                  novo recebe o link mesmo assim.
                 </p>
               </div>
             )}
@@ -1464,6 +1478,44 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               {"{link}"} insere o link rastreado; {"{username}"} personaliza a mensagem;
               {" {oi|olá|e aí}"} sorteia uma opção a cada envio.
             </p>
+            <div className="space-y-2 border-t border-border pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">
+                  mensagem diferente para quem segue e para quem não segue
+                </span>
+                <Toggle
+                  on={audienceDmEnabled}
+                  onToggle={() => setAudienceDmEnabled(!audienceDmEnabled)}
+                />
+              </div>
+              {audienceDmEnabled && (
+                <div className="space-y-2">
+                  <label className="text-xs text-muted">Para quem já segue o perfil</label>
+                  <textarea
+                    value={followerDmMessage}
+                    onChange={(e) => setFollowerDmMessage(e.target.value)}
+                    placeholder="Oi {username}! Obrigado por acompanhar o perfil 🙌 Aqui está: {link}"
+                    rows={2}
+                    maxLength={1000}
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none resize-none"
+                  />
+                  <label className="text-xs text-muted">Para quem ainda não segue</label>
+                  <textarea
+                    value={nonFollowerDmMessage}
+                    onChange={(e) => setNonFollowerDmMessage(e.target.value)}
+                    placeholder="Oi {username}! Aqui está o que você pediu: {link} — se curtir, segue o perfil pra receber os próximos 😉"
+                    rows={2}
+                    maxLength={1000}
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none resize-none"
+                  />
+                  <p className="text-xs text-muted">
+                    Verificamos na hora se a pessoa segue o perfil e guardamos isso
+                    no contato (dá pra filtrar seguidores e não seguidores em
+                    Contatos). Campo vazio ou relação não verificada usa a DM padrão.
+                  </p>
+                </div>
+              )}
+            </div>
             <div className="space-y-2 border-t border-border pt-2">
               {dmVariations.map((msg, i) => (
                 <div key={i} className="flex items-start gap-2">

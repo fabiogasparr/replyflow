@@ -31,6 +31,10 @@ vi.mock("@/lib/db/client", () => ({
 vi.mock("@/lib/meta/oauth", () => ({ decryptToken: mocks.decryptToken }));
 vi.mock("@/lib/meta/client", () => ({
   getUserFollowStatus: mocks.getUserFollowStatus,
+  getUserFollowProfile: async (token: string, id: string) => ({
+    follows: await mocks.getUserFollowStatus(token, id),
+    followedBy: null,
+  }),
   sendDirectMessageWithButton: mocks.sendDirectMessageWithButton,
 }));
 vi.mock("@/lib/billing/usage", () => ({
@@ -43,6 +47,7 @@ vi.mock("@/lib/automations/operational-state", () => ({
 }));
 vi.mock("@/lib/queue/client", () => ({
   FOLLOWUP_JOB_NAME: "process-followup",
+  POSTBACK_JOB_NAME: "process-postback",
   getDMQueue: () => ({ add: mocks.queueAdd }),
 }));
 vi.mock("@/lib/utils/rate-limiter", () => ({
@@ -179,6 +184,56 @@ describe("postback queue handler", () => {
     expect(mocks.recordAutomationFailure).toHaveBeenCalledWith(
       "automation_1",
       error
+    );
+  });
+
+  it("delivers the link on a scheduled re-check once the person follows", async () => {
+    mocks.automationFindFirst.mockResolvedValue({ ...configuredAutomation, requireFollow: true });
+    mocks.getUserFollowStatus.mockResolvedValue(true);
+
+    await processPostback(job({ payload: "followcheck:automation_1", autoRecheck: true }));
+
+    expect(mocks.sendRevealDirectMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.sendDirectMessageWithButton).not.toHaveBeenCalled();
+  });
+
+  it("stays silent on a scheduled re-check when the person still does not follow or is unknown", async () => {
+    mocks.automationFindFirst.mockResolvedValue({ ...configuredAutomation, requireFollow: true });
+    mocks.getUserFollowStatus.mockResolvedValue(false);
+    await processPostback(job({ payload: "followcheck:automation_1", autoRecheck: true }));
+    mocks.getUserFollowStatus.mockResolvedValue(null);
+    await processPostback(job({ payload: "followcheck:automation_1", autoRecheck: true }));
+
+    expect(mocks.sendRevealDirectMessage).not.toHaveBeenCalled();
+    expect(mocks.sendDirectMessageWithButton).not.toHaveBeenCalled();
+    expect(mocks.dmLogUpsert).not.toHaveBeenCalled();
+  });
+
+  it("skips a scheduled re-check when the link already went out", async () => {
+    mocks.automationFindFirst.mockResolvedValue({ ...configuredAutomation, requireFollow: true });
+    mocks.dmLogFindUnique.mockResolvedValue({ status: "SENT" });
+    await processPostback(job({ payload: "followcheck:automation_1", autoRecheck: true }));
+    expect(mocks.getUserFollowStatus).not.toHaveBeenCalled();
+    expect(mocks.sendRevealDirectMessage).not.toHaveBeenCalled();
+  });
+
+  it("uses the audience wording for verified followers on a button tap", async () => {
+    mocks.automationFindFirst.mockResolvedValue({
+      ...configuredAutomation,
+      audienceDmEnabled: true,
+      followerDmMessage: "Valeu por seguir! {link}",
+      nonFollowerDmMessage: "Segue a gente 😉 {link}",
+    });
+    mocks.getUserFollowStatus.mockResolvedValue(true);
+
+    await processPostback(job());
+
+    expect(mocks.sendRevealDirectMessage).toHaveBeenCalledWith(
+      "plain-token",
+      expect.objectContaining({ dmMessage: "Valeu por seguir! {link}" }),
+      "person_1",
+      "Bia",
+      "postback"
     );
   });
 });

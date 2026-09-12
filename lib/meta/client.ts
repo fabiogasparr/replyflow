@@ -827,3 +827,50 @@ export async function clearInstagramIceBreakers(
   });
   return handleResponse(response);
 }
+
+export interface UserFollowProfile {
+  /** Does this person follow the connected account? */
+  follows: boolean | null;
+  /** Does the connected account follow this person back? */
+  followedBy: boolean | null;
+  username?: string;
+  name?: string;
+}
+
+/**
+ * Relationship between a messaging user and the connected account, from the
+ * same profile endpoint as getUserFollowStatus but with both directions and
+ * the current username. Never throws: unknowns come back as null.
+ */
+export async function getUserFollowProfile(
+  accessToken: string,
+  recipientId: string
+): Promise<UserFollowProfile> {
+  const url = new URL(`${instagramGraphBase()}/${recipientId}`);
+  url.searchParams.set(
+    "fields",
+    "username,name,is_user_follow_business,is_business_follow_user"
+  );
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) return { follows: null, followedBy: null };
+    const data = await response.json();
+    return {
+      follows:
+        typeof data?.is_user_follow_business === "boolean"
+          ? data.is_user_follow_business
+          : null,
+      followedBy:
+        typeof data?.is_business_follow_user === "boolean"
+          ? data.is_business_follow_user
+          : null,
+      username: typeof data?.username === "string" ? data.username : undefined,
+      name: typeof data?.name === "string" ? data.name : undefined,
+    };
+  } catch {
+    return { follows: null, followedBy: null };
+  }
+}

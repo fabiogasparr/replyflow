@@ -83,6 +83,11 @@ Execute `node scripts/test-staging.mjs` depois de iniciar o ambiente para testar
 o login completo de ambos os usuários, criação automática de assinatura, leitura
 isolada e rejeição de alteração entre tenants. O script só aceita a configuração
 de homologação com Mailpit e deixa um campo sintético no primeiro workspace.
+Ele também verifica o wizard autenticado, a rejeição de destinatários ambíguos
+sem novos e-mails e os atributos de segurança do cookie de sessão em HTTPS.
+Execute sem outros logins simultâneos no Mailpit para manter a contagem de
+mensagens verificável. Consulte a [auditoria e correções](SECURITY_DEPENDENCIES_2026_09.md)
+antes de publicar uma nova imagem e execute `npm run security:audit`.
 
 A conexão OAuth exige estado assinado, prazo de dez minutos, usuário iniciador
 e cookie HTTP-only do mesmo navegador. Uma implantação desta alteração invalida

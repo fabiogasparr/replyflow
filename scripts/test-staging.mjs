@@ -27,6 +27,11 @@ function client() {
     for (const cookie of response.headers.getSetCookie()) {
       const pair = cookie.split(';', 1)[0];
       const equal = pair.indexOf('=');
+      if (pair.slice(0, equal).endsWith('session-token') && base.protocol === 'https:') {
+        assert.ok(/;\s*Secure(?:;|$)/i.test(cookie), 'Sessão pública deve usar cookie Secure.');
+        assert.ok(/;\s*HttpOnly(?:;|$)/i.test(cookie), 'Sessão não pode ser acessível ao JavaScript.');
+        assert.ok(/;\s*SameSite=Lax(?:;|$)/i.test(cookie), 'Sessão deve manter proteção SameSite.');
+      }
       cookies.set(pair.slice(0, equal), pair.slice(equal + 1));
     }
     return response;
@@ -64,6 +69,7 @@ for (const email of ['tester@replyflow.test,blocked@replyflow.test', 'Tester <te
   const request = client();
   const csrf = await (await request('/api/auth/csrf')).json();
   const before = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  assert.equal(typeof before.total, 'number', 'Mailpit deve informar a contagem antes da tentativa.');
   const response = await request('/api/auth/signin/nodemailer', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ csrfToken: csrf.csrfToken, email, callbackUrl: `${base.origin}/dashboard` }),
@@ -71,6 +77,7 @@ for (const email of ['tester@replyflow.test,blocked@replyflow.test', 'Tester <te
   const target = new URL(response.headers.get('location'), base);
   assert.ok(target.searchParams.has('error'), 'Sintaxe ambígua deve ser rejeitada no fluxo real de login.');
   const after = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  assert.equal(typeof after.total, 'number', 'Mailpit deve informar a contagem após a tentativa.');
   assert.equal(after.total, before.total, 'Tentativa inválida não pode gerar e-mail. Execute sem logins concorrentes.');
 }
 

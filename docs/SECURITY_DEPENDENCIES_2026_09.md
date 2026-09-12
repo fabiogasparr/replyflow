@@ -50,3 +50,9 @@ Validação local: 569 testes em 75 arquivos, lint, typecheck, geração do Pris
 Construir a imagem com `npm ci` pelo serviço `migrate`, sem alterar `.env.staging` ou volumes. Iniciar novamente web/worker/cron com essa imagem e executar `node scripts/test-staging.mjs` antes de habilitar o túnel. Revalidar a auditoria antes de cada publicação.
 
 Se a atualização de e-mail apresentar regressão, retirar primeiro o túnel do ar. Reverter os commits de dependências e reconstruir a imagem anterior preserva banco, sessões e chaves, mas também restaura os alertas conhecidos: a versão anterior deve permanecer apenas local até uma correção segura. Nunca usar `down -v`, apagar o banco ou girar chaves como forma de rollback de bibliotecas.
+
+## Resultado da homologação corrigida
+
+A imagem foi construída com instalação limpa (`npm ci`) e auditoria sem alertas. O teste SMTP passou tanto em loopback quanto pelo endereço HTTPS temporário: rejeitou três formatos ambíguos sem gerar mensagens no Mailpit, autenticou os dois usuários de teste e confirmou o isolamento do CRM e do wizard. O CI do commit de correção também passou, incluindo o novo gate de auditoria e os testes de banco/Redis existentes.
+
+Depois dessas verificações, o túnel foi habilitado somente para a aplicação de homologação. Mailpit permanece em `127.0.0.1:8026`; PostgreSQL e Redis continuam sem portas publicadas. A lista de acesso permanece restrita aos dois endereços sintéticos. O host atual fica em `NEXTAUTH_URL` do arquivo privado de homologação, pois pode mudar quando o túnel é recriado. Isso libera testes controlados, não uma operação comercial irrestrita.

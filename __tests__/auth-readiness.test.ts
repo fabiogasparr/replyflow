@@ -64,6 +64,10 @@ describe("email authentication readiness", () => {
 });
 
 describe("safe authentication error content", () => {
+  it("explains temporary sending limits separately from configuration failures", () => {
+    expect(getAuthErrorContent("TooManyRequests").title).toBe("Aguarde antes de pedir outro link");
+    expect(getAuthErrorContent("ServiceUnavailable").description).toContain("limite de envio");
+  });
   it("translates known Auth.js errors without exposing diagnostics", () => {
     expect(getAuthErrorContent("Configuration")).toEqual({
       title: "Acesso temporariamente indisponível",

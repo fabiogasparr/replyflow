@@ -48,6 +48,14 @@ async function login(email) {
   });
   assert.ok([200, 302, 303].includes(signIn.status), 'Solicitação de acesso aceita.');
   const listing = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  assert.equal(typeof listing.total, 'number');
+  const duplicate = await request('/api/auth/signin/nodemailer', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ csrfToken: csrf.csrfToken, email, callbackUrl: `${base.origin}/dashboard` }),
+  });
+  assert.equal(new URL(duplicate.headers.get('location'), base).searchParams.get('error'), 'TooManyRequests', 'Reenvio imediato deve ser limitado.');
+  const afterDuplicate = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  assert.equal(afterDuplicate.total, listing.total, 'Reenvio limitado não pode gerar outro e-mail.');
   const message = listing.messages.find(message => message.To.some(to => to.Address === email));
   assert.ok(message, 'Link de acesso capturado no Mailpit local.');
   const content = await (await fetch(`${mailpit}/api/v1/message/${message.ID}`)).json();
@@ -111,5 +119,5 @@ if (!env.INSTAGRAM_APP_ID) {
   const wizardConnect = await first(`/api/instagram/connect?flow=wizard&workspaceId=${encodeURIComponent(firstOnboarding.workspace.id)}`);
   assert.equal(new URL(wizardConnect.headers.get('location')).pathname, '/settings/instagram', 'Falha de configuração retorna ao wizard.');
 }
-console.log('✓ HTTPS/HTTP, saúde, rejeição de destinatários ambíguos, login por e-mail, dois tenants, assinatura Free, wizard e isolamento real aprovados.');
+console.log('✓ HTTPS/HTTP, saúde, destinatários válidos, limite de reenvio, login por e-mail, dois tenants, assinatura Free, wizard e isolamento real aprovados.');
 console.log('Nenhuma mensagem foi enviada ao Instagram. E-mails capturados somente no Mailpit.');

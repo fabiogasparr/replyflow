@@ -48,6 +48,25 @@ Uma mudança do endereço exige atualizar `NEXTAUTH_URL`, recriar web/worker/cro
 e cadastrar novamente callback OAuth e webhook na Meta. Para App Review e
 operação comercial, use uma origem HTTPS estável em um servidor permanente.
 
+### Recuperar um endereço temporário indisponível
+
+Em 12/09/2026, o túnel antigo deixou de resolver no DNS e passou a registrar
+`Unauthorized: Tunnel not found`, embora web, banco, Redis e worker estivessem saudáveis.
+Nesse caso, reiniciar a aplicação ou apagar seus volumes não corrige o registro do túnel.
+
+1. Consulte `docker-compose --env-file .env.staging -f compose.staging.yml ps`,
+   `/api/health` em `http://localhost:3100` e os logs do serviço `tunnel`.
+2. Se essa falha de registro for confirmada, execute `restart tunnel` no mesmo compose.
+   Aguarde o novo endereço e a mensagem `Registered tunnel connection` nos logs.
+3. Configure a nova origem com `node scripts/staging.mjs url https://ENDERECO.trycloudflare.com`.
+4. Aplique com `docker-compose --env-file .env.staging -f compose.staging.yml up -d --no-deps --no-build web worker cron`.
+5. Verifique saúde, login e `/api/auth/providers` pelo novo HTTPS. Solicite um novo
+   link de acesso, pois e-mails anteriores podem apontar para o endereço antigo.
+   Caso a Meta já esteja configurada, atualize também callback e webhook no painel.
+
+Essa recuperação mantém bancos, volumes e segredos. Não representa garantia de
+disponibilidade do endereço substituto nem substitui uma hospedagem permanente.
+
 ## Meta: o que ainda precisa de validação externa
 
 1. Aplicativo Meta com Instagram API with Instagram Login habilitada.
@@ -85,6 +104,9 @@ isolada e rejeição de alteração entre tenants. O script só aceita a configu
 de homologação com Mailpit e deixa um campo sintético no primeiro workspace.
 Ele também verifica o wizard autenticado, a rejeição de destinatários ambíguos
 sem novos e-mails e os atributos de segurança do cookie de sessão em HTTPS.
+Com a proteção de login instalada, também exige bloqueio do reenvio imediato
+sem novo e-mail e autenticação usando o primeiro link. Não execute esta versão
+do teste contra imagens anteriores ao controle de reenvio.
 Execute sem outros logins simultâneos no Mailpit para manter a contagem de
 mensagens verificável. Consulte a [auditoria e correções](SECURITY_DEPENDENCIES_2026_09.md)
 antes de publicar uma nova imagem e execute `npm run security:audit`.

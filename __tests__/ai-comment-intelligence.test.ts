@@ -80,6 +80,24 @@ describe("AI client", () => {
     await expect(chatCompletion({ messages: [] })).rejects.toThrow(/HTTP 503/);
   });
 
+  it("strips <think> blocks and recognises a leaked scratchpad", async () => {
+    const { stripReasoning, looksLikeReasoning } = await import("@/lib/ai/client");
+    expect(stripReasoning("<think>plan…</think>Oi! Te mandei no direct")).toBe("Oi! Te mandei no direct");
+    expect(stripReasoning("<think>never closed")).toBe("");
+    expect(looksLikeReasoning("We need to produce a public reply in Portuguese…")).toBe(true);
+    expect(looksLikeReasoning("Let me think about the comment first")).toBe(true);
+    expect(looksLikeReasoning("Oi Bia! Te mandei o guia no direct 😊")).toBe(false);
+
+    vi.stubGlobal("fetch", vi.fn(async () => completion("We need to produce a public reply that says…")));
+    expect(
+      await generatePersonalizedPublicReply({ commentText: "guia", commenterName: "Bia", context })
+    ).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => completion("<think>hmm</think>Oi Bia, te mandei o guia no direct 😊")));
+    expect(
+      await generatePersonalizedPublicReply({ commentText: "guia", commenterName: "Bia", context })
+    ).toBe("Oi Bia, te mandei o guia no direct 😊");
+  });
+
   it("parses JSON out of fenced or chatty completions", () => {
     expect(parseJsonObject('```json\n{"a":1}\n```')).toEqual({ a: 1 });
     expect(parseJsonObject('Claro! Aqui está: {"a":{"b":2}} espero que ajude')).toEqual({

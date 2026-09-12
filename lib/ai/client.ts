@@ -99,12 +99,39 @@ async function callModel(
     const data = (await response.json()) as {
       choices?: { message?: { content?: string | null } }[];
     };
-    const text = data.choices?.[0]?.message?.content?.trim();
+    const text = stripReasoning(data.choices?.[0]?.message?.content ?? "");
     if (!text) throw new Error(`AI ${model} returned an empty completion`);
     return text;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Reasoning models sometimes return their scratchpad inside the content
+ * (as <think>…</think> blocks, or as plain prose when the token budget was
+ * exhausted mid-thought). Strip explicit blocks here; callers reject prose
+ * that still looks like reasoning via looksLikeReasoning().
+ */
+export function stripReasoning(text: string): string {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think>[\s\S]*$/i, "")
+    .trim();
+}
+
+const REASONING_OPENERS =
+  /^(we need|we should|we must|the user|let'?s|let me|i need to|i should|i will|okay,|ok,|first,|thinking|reasoning)\b/i;
+
+/**
+ * Heuristic for a scratchpad leak: an English planning voice talking about
+ * the task instead of the reply itself. Replies to Brazilian followers never
+ * legitimately start like this.
+ */
+export function looksLikeReasoning(text: string): boolean {
+  const head = text.trim().slice(0, 80);
+  if (REASONING_OPENERS.test(head)) return true;
+  return /\b(public reply|the comment|the reply|must not|should not include|max(imum)? \d+ chars)\b/i.test(text);
 }
 
 /**

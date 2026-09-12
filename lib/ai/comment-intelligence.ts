@@ -9,7 +9,12 @@
  * to `null` so the worker falls back to the campaign's own templates.
  */
 
-import { chatCompletion, isAiConfigured, parseJsonObject } from "./client";
+import {
+  chatCompletion,
+  isAiConfigured,
+  looksLikeReasoning,
+  parseJsonObject,
+} from "./client";
 import { hasSpintax, listSpintaxExpansions } from "@/lib/messaging/variation";
 
 export type ModerationSensitivity = "HOSTILE" | "NEGATIVE";
@@ -79,10 +84,11 @@ export async function assessComment(
             `Você tria comentários recebidos pelo perfil @${context.brandUsername} no Instagram. ` +
             "Responda SOMENTE um objeto JSON com os campos: " +
             `"sentiment" ("POSITIVE" | "NEUTRAL" | "NEGATIVE"), ` +
-            `"hostile" (true quando o texto é ofensivo, depreciativo, ameaçador, discriminatório ou spam), ` +
-            `"needsHuman" (true quando é reclamação, pedido de reembolso, problema urgente, ironia agressiva ou algo que um texto automático não resolve), ` +
+            `"hostile" (true SOMENTE quando o texto é ofensivo, depreciativo, ameaçador, discriminatório ou spam), ` +
+            `"needsHuman" (true SOMENTE para reclamação de cliente, pedido de reembolso/cancelamento, problema urgente, ameaça legal ou ironia agressiva — situações em que enviar um material automático seria inadequado), ` +
             `"reason" (frase curta em português explicando). ` +
-            "Um comentário que só pede o link, elogia ou usa a palavra-chave é POSITIVE ou NEUTRAL, hostile=false e needsHuman=false.",
+            "A automação responde comentários enviando um material/link no direct. Portanto: pedidos de link, elogios, curiosidade, perguntas comuns sobre o produto (se funciona para X, como funciona, serve para mim?) e comentários com a palavra-chave são POSITIVE ou NEUTRAL, hostile=false e needsHuman=false — uma dúvida não é motivo para reservar a um humano. " +
+            "Responda apenas o JSON, sem raciocínio.",
         },
         { role: "user", content: `Comentário: """${text.slice(0, 1000)}"""` },
       ],
@@ -138,13 +144,13 @@ export async function generatePersonalizedPublicReply(params: {
   try {
     const { text } = await chatCompletion({
       temperature: 0.8,
-      maxTokens: 160,
+      maxTokens: 400,
       messages: [
         { role: "system", content: baseSystemPrompt(params.context) },
         {
           role: "user",
           content: [
-            "Escreva UMA resposta pública para o comentário abaixo, como se fosse a própria marca respondendo no post.",
+            "Escreva UMA resposta pública para o comentário abaixo, como se fosse a própria marca respondendo no post. Responda direto com o texto final, sem raciocinar em voz alta.",
             "A pessoa vai receber o material/link no direct, então a resposta deve dizer isso de forma natural e personalizada ao que ela escreveu.",
             params.templateExample
               ? `Exemplo do estilo que a marca usa: "${params.templateExample}"`
@@ -158,6 +164,7 @@ export async function generatePersonalizedPublicReply(params: {
         },
       ],
     });
+    if (looksLikeReasoning(text)) return null;
     const reply = trimTo(stripQuotes(text), PUBLIC_REPLY_MAX_CHARS);
     if (!reply || /https?:\/\//i.test(reply)) return null;
     return reply;
@@ -183,14 +190,15 @@ export async function generatePersonalizedDm(params: {
   try {
     const { text } = await chatCompletion({
       temperature: 0.8,
-      maxTokens: 260,
+      maxTokens: 500,
       messages: [
         { role: "system", content: baseSystemPrompt(params.context) },
         {
           role: "user",
           content: [
-            "Escreva a mensagem direta (DM) que a marca envia para quem fez o comentário abaixo.",
-            `Use este modelo como base de conteúdo e intenção, adaptando o texto ao comentário da pessoa: """${params.template}"""`,
+            "Escreva a mensagem direta (DM) que a marca envia para quem fez o comentário abaixo. Responda direto com o texto final, sem raciocinar em voz alta.",
+            `Use este modelo como base de conteúdo e intenção: """${params.template}"""`,
+            "Personalize de verdade: mencione ou responda brevemente ao que a pessoa escreveu no comentário (uma frase), mantendo o mesmo objetivo do modelo. Não copie o modelo sem mudanças.",
             "Mantenha os marcadores {username} (nome da pessoa) e, se existir no modelo, {link} exatamente assim, sem substituí-los.",
             params.hasLink
               ? "A DM DEVE conter o marcador {link} uma vez, onde o link entra."
@@ -202,6 +210,7 @@ export async function generatePersonalizedDm(params: {
         },
       ],
     });
+    if (looksLikeReasoning(text)) return null;
     let dm = trimTo(stripQuotes(text), DM_MAX_CHARS);
     if (!dm) return null;
     if (params.hasLink && !/\{link\}/i.test(dm)) dm = `${dm} {link}`;

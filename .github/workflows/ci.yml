@@ -10,6 +10,7 @@ jobs:
   test:
     name: Application and database checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     services:
@@ -76,6 +77,16 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
 
+      - name: Verify contact privacy and retention constraints
+        run: npm run test:contact-privacy-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify contact custom fields and tenant ownership
+        run: npm run test:contact-custom-fields-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
       - name: Verify safe DM retry migration
         run: npm run test:dm-retry-db
         env:
@@ -93,6 +104,46 @@ jobs:
 
       - name: Verify automation operational-state migration
         run: npm run test:automation-state-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify subscription lifecycle and billing constraints
+        run: npm run test:billing-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify concurrent usage metering and compensation
+        run: npm run test:billing-usage-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify platform administration roles and audit schema
+        run: npm run test:platform-admin-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify platform observability indexes
+        run: npm run test:platform-observability-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify performance reporting indexes
+        run: npm run test:performance-reporting-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify shared report lifecycle and constraints
+        run: npm run test:report-sharing-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify support triage index
+        run: npm run test:platform-support-db
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
+
+      - name: Verify versioned flow layouts and tenant ownership
+        run: npm run test:flow-layout-db
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/replyflow_test
 

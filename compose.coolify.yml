@@ -1,0 +1,159 @@
+name: replyflow
+
+# Implantação permanente no Coolify (Docker Compose a partir do repositório).
+#
+# - Somente o serviço `web` recebe domínio público (SERVICE_FQDN_WEB_3000).
+#   Coolify configura o proxy/TLS; PostgreSQL, Redis, worker e cron ficam na
+#   rede interna do stack, sem portas publicadas no host.
+# - Segredos internos (senha do banco, NEXTAUTH_SECRET, CRON_SECRET,
+#   ENCRYPTION_KEY com 64 hexadecimais, WEBHOOK_VERIFY_TOKEN) são gerados pelo
+#   Coolify por meio das variáveis SERVICE_* e nunca ficam versionados.
+# - Credenciais externas (Meta e e-mail) ficam vazias aqui e devem ser
+#   preenchidas na tela de variáveis de ambiente do Coolify:
+#   INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, FACEBOOK_APP_SECRET e
+#   RESEND_API_KEY ou EMAIL_SERVER (nunca os dois). ALLOWED_EMAILS vazio libera
+#   cadastro público; preencher para restringir a homologação.
+# - As migrations do Prisma executam no início do serviço `web`, antes do
+#   `next start`; worker e cron só sobem depois do web. Ver docs/DEPLOY_COOLIFY.md.
+# - Os três serviços da aplicação compartilham a mesma imagem; o Docker
+#   reaproveita o cache e constrói o Dockerfile uma única vez por deploy.
+# - Sem âncoras YAML de propósito: cada serviço declara o ambiente completo
+#   para que o Coolify leia e edite as variáveis sem ambiguidade.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: replyflow
+      POSTGRES_USER: replyflow
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+    volumes:
+      - replyflow-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U replyflow -d replyflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - replyflow-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: replyflow-app:coolify
+    init: true
+    restart: unless-stopped
+    command: ["sh", "-c", "npm run db:migrate && npm run start"]
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://replyflow:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/replyflow
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_URL: ${SERVICE_URL_WEB}
+      NEXTAUTH_SECRET: ${SERVICE_BASE64_64_NEXTAUTH}
+      CRON_SECRET: ${SERVICE_BASE64_64_CRON}
+      ENCRYPTION_KEY: ${SERVICE_HEX_64_ENCRYPTION}
+      WEBHOOK_VERIFY_TOKEN: ${SERVICE_BASE64_64_WEBHOOK}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v25.0}
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_SERVER: ${EMAIL_SERVER}
+      EMAIL_FROM: ${EMAIL_FROM:-ReplyFlow <login@kz3solucoes.cloud>}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS}
+      SERVICE_FQDN_WEB_3000: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # /api/health responde 200 apenas com banco, Redis, fila e heartbeat do
+      # worker; o worker sobe logo após o web, por isso o start_period é longo.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: replyflow-app:coolify
+    init: true
+    restart: unless-stopped
+    command: ["npm", "run", "worker"]
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://replyflow:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/replyflow
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_URL: ${SERVICE_URL_WEB}
+      NEXTAUTH_SECRET: ${SERVICE_BASE64_64_NEXTAUTH}
+      CRON_SECRET: ${SERVICE_BASE64_64_CRON}
+      ENCRYPTION_KEY: ${SERVICE_HEX_64_ENCRYPTION}
+      WEBHOOK_VERIFY_TOKEN: ${SERVICE_BASE64_64_WEBHOOK}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v25.0}
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_SERVER: ${EMAIL_SERVER}
+      EMAIL_FROM: ${EMAIL_FROM:-ReplyFlow <login@kz3solucoes.cloud>}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: replyflow-app:coolify
+    init: true
+    restart: unless-stopped
+    command: ["sh", "scripts/cron.sh"]
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://replyflow:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/replyflow
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_URL: ${SERVICE_URL_WEB}
+      NEXTAUTH_SECRET: ${SERVICE_BASE64_64_NEXTAUTH}
+      CRON_SECRET: ${SERVICE_BASE64_64_CRON}
+      ENCRYPTION_KEY: ${SERVICE_HEX_64_ENCRYPTION}
+      WEBHOOK_VERIFY_TOKEN: ${SERVICE_BASE64_64_WEBHOOK}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v25.0}
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_SERVER: ${EMAIL_SERVER}
+      EMAIL_FROM: ${EMAIL_FROM:-ReplyFlow <login@kz3solucoes.cloud>}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS}
+      CRON_BASE_URL: http://web:3000
+    depends_on:
+      web:
+        condition: service_started
+
+volumes:
+  replyflow-postgres:
+  replyflow-redis:

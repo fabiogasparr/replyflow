@@ -43,7 +43,7 @@ Critério de saída: ambiente reproduzível, auditoria de segurança tratada, CI
 Objetivo: apresentar um produto coerente com a marca ReplyFlow.
 
 - [x] Definir identidade visual e tom de voz.
-- [ ] Definir domínio de produção.
+- [ ] Definir domínio de produção. (Origem HTTPS permanente definida em 12/09/2026: `replyflow.kz3solucoes.cloud` no Coolify, ver `docs/DEPLOY_COOLIFY.md`; domínio comercial definitivo pendente.)
 - [x] Substituir referências visuais e textuais do OpenReply no código do produto.
 - [x] Adicionar infraestrutura de internacionalização.
 - [ ] Traduzir site, autenticação, painel, mensagens de erro e e-mails.
@@ -261,6 +261,7 @@ Progresso validado em 9 e 10 de setembro de 2026:
 
 ## Próxima execução recomendada
 
+0. Publicar no Coolify, criar o app Meta "ReplyFlow", validar a conexão real com contas de teste e submeter o App Review (`docs/DEPLOY_COOLIFY.md`).
 1. Adicionar cobrança recorrente com cartão e Pix e definir preços dos planos.
 2. Evoluir alertas globais de worker e fila sem permitir acesso a conteúdo dos clientes.
 3. Adicionar o teste end-to-end mínimo de acesso e criação de campanha.

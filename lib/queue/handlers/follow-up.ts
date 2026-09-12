@@ -12,6 +12,7 @@ import {
   MISSING_INSTAGRAM_TOKEN_ERROR,
 } from "../user-facing-copy";
 import { renderMessageWithoutLink } from "@/lib/tracking/message";
+import { resolveMessageText, waitForSendSlot } from "@/lib/messaging/pacing";
 import { formatWorkerError } from "../delivery";
 
 /**
@@ -56,12 +57,19 @@ export async function processFollowUp(
   }
 
   try {
+    const followUpText =
+      (await resolveMessageText(
+        automation.id,
+        "followUp",
+        automation.followUpMessage
+      )) ?? automation.followUpMessage;
+    await waitForSendSlot(instagramAccountId);
     await sendDirectMessage(
       accessToken,
       automation.instagramAccount.instagramId,
       userId,
       renderMessageWithoutLink({
-        message: automation.followUpMessage,
+        message: followUpText,
         commenterName: commenterName ?? null,
       })
     );

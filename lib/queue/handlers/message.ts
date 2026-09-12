@@ -15,8 +15,15 @@ import {
   recordAutomationSuccess,
 } from "@/lib/automations/operational-state";
 import { renderMessageWithoutLink } from "@/lib/tracking/message";
+import { reserveDMSlot } from "@/lib/utils/rate-limiter";
+import {
+  pickHumanDelayMs,
+  resolveMessageText,
+  waitForSendSlot,
+} from "@/lib/messaging/pacing";
 import {
   FOLLOWUP_JOB_NAME,
+  MESSAGE_JOB_NAME,
   getDMQueue,
   type ProcessMessageJob,
 } from "../client";
@@ -29,6 +36,8 @@ import {
   DEFAULT_FOLLOW_PROMPT_MESSAGE,
   INVALID_INSTAGRAM_TOKEN_ERROR,
   MISSING_INSTAGRAM_TOKEN_ERROR,
+  hourlyDmLimitError,
+  hourlyDmRetryMessage,
   inactiveAutomationError,
   monthlyDmLimitError,
 } from "../user-facing-copy";
@@ -45,6 +54,7 @@ export async function processMessage(
   job: Job<ProcessMessageJob>
 ): Promise<void> {
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
+  const requeueAttempt = job.data.requeueAttempt ?? 0;
 
   const automations = await prisma.automation.findMany({
     where: {
@@ -113,6 +123,29 @@ export async function processMessage(
       continue;
     }
     if (existingLog?.status === "FAILED" && existingLog.deliveryAttemptedAt) {
+      continue;
+    }
+
+    // Human delay: answer a DM a few seconds later than instantly, like a
+    // person would. Served by a delayed job scoped to this campaign.
+    const humanDelayMs =
+      job.data.automationId || job.data.humanDelayApplied
+        ? 0
+        : pickHumanDelayMs(automation);
+    if (humanDelayMs > 0) {
+      await getDMQueue().add(
+        MESSAGE_JOB_NAME,
+        {
+          ...job.data,
+          automationId: automation.id,
+          matchedKeyword: matchResult.matchedKeyword,
+          humanDelayApplied: true,
+        },
+        {
+          delay: humanDelayMs,
+          jobId: `message_${instagramAccountId}_${Buffer.from(messageId).toString("base64url")}_${automation.id}_delayed`,
+        }
+      );
       continue;
     }
 
@@ -228,6 +261,67 @@ export async function processMessage(
       continue;
     }
 
+    // Same per-account hourly ceiling as comment replies: a DM burst from the
+    // keyword trigger must not push the account past Meta's cap.
+    const rateLimit = await reserveDMSlot(instagramAccountId, requeueAttempt);
+    if (!rateLimit.allowed) {
+      await releaseWorkspaceDMReservation(
+        automation.workspaceId,
+        usage.periodStart
+      );
+      const skipped = rateLimit.shouldSkip;
+      await prisma.dmLog.upsert({
+        where: {
+          automationId_commentId: {
+            automationId: automation.id,
+            commentId: dedupeId,
+          },
+        },
+        create: {
+          ...logBase,
+          status: skipped ? "SKIPPED_RATE_LIMIT" : "PENDING",
+          errorMessage: skipped ? hourlyDmLimitError : hourlyDmRetryMessage,
+        },
+        update: {
+          ...logBase,
+          status: skipped ? "SKIPPED_RATE_LIMIT" : "PENDING",
+          errorMessage: skipped ? hourlyDmLimitError : hourlyDmRetryMessage,
+        },
+      });
+      if (rateLimit.shouldRequeue) {
+        await getDMQueue().add(
+          MESSAGE_JOB_NAME,
+          {
+            ...job.data,
+            automationId: automation.id,
+            matchedKeyword: matchResult.matchedKeyword,
+            humanDelayApplied: true,
+            requeueAttempt: requeueAttempt + 1,
+          },
+          {
+            delay: rateLimit.requeueDelayMs,
+            jobId: `message_${instagramAccountId}_${Buffer.from(messageId).toString("base64url")}_${automation.id}_retry_${requeueAttempt + 1}`,
+          }
+        );
+      }
+      continue;
+    }
+
+    const followPromptText = sendFollowPrompt
+      ? ((await resolveMessageText(
+          automation.id,
+          "followPrompt",
+          automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE
+        )) ?? DEFAULT_FOLLOW_PROMPT_MESSAGE)
+      : null;
+    const dmText =
+      (await resolveMessageText(
+        automation.id,
+        "dm",
+        automation.dmMessage,
+        automation.dmMessages
+      )) ?? automation.dmMessage;
+
     const deliveryAttemptedAt = new Date();
     await prisma.dmLog.upsert({
       where: {
@@ -254,10 +348,10 @@ export async function processMessage(
     });
 
     try {
+      await waitForSendSlot(instagramAccountId);
       if (sendFollowPrompt) {
         const promptText = renderMessageWithoutLink({
-          message:
-            automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE,
+          message: followPromptText as string,
           commenterName,
         });
         await sendDirectMessageWithButton(
@@ -272,7 +366,7 @@ export async function processMessage(
       } else {
         await sendRevealDirectMessage(
           accessToken,
-          automation,
+          { ...automation, dmMessage: dmText },
           senderId,
           commenterName,
           "message trigger"

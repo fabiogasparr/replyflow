@@ -49,7 +49,14 @@ vi.mock("@/lib/automations/operational-state", () => ({
 }));
 vi.mock("@/lib/queue/client", () => ({
   FOLLOWUP_JOB_NAME: "process-followup",
-  getDMQueue: () => ({ add: mocks.queueAdd }),
+  MESSAGE_JOB_NAME: "process-message",
+getDMQueue: () => ({ add: mocks.queueAdd }),
+}));
+const rateLimiter = vi.hoisted(() => ({
+  reserveDMSlot: vi.fn(),
+}));
+vi.mock("@/lib/utils/rate-limiter", () => ({
+  reserveDMSlot: rateLimiter.reserveDMSlot,
 }));
 vi.mock("@/lib/queue/delivery", () => ({
   formatWorkerError: (error: unknown) =>
@@ -99,6 +106,15 @@ function job(overrides: Partial<ProcessMessageJob> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rateLimiter.reserveDMSlot.mockResolvedValue({
+    allowed: true,
+    currentCount: 1,
+    remainingDMs: 749,
+    shouldRequeue: false,
+    requeueDelayMs: 0,
+    shouldSkip: false,
+    reserved: true,
+  });
   mocks.automationFindMany.mockResolvedValue([configuredAutomation]);
   mocks.dmLogFindUnique.mockResolvedValue(null);
   mocks.dmLogFindFirst.mockResolvedValue({ commenterName: "Bia" });
@@ -211,6 +227,50 @@ describe("inbound message queue handler", () => {
     expect(mocks.recordAutomationFailure).toHaveBeenCalledWith(
       "automation_1",
       error
+    );
+  });
+
+  it("applies the per-account hourly ceiling to keyword DMs", async () => {
+    rateLimiter.reserveDMSlot.mockResolvedValue({
+      allowed: false,
+      currentCount: 750,
+      remainingDMs: 0,
+      shouldRequeue: true,
+      requeueDelayMs: 1_800_000,
+      shouldSkip: false,
+      reserved: false,
+    });
+
+    await processMessage(job());
+
+    expect(mocks.sendRevealDirectMessage).not.toHaveBeenCalled();
+    expect(mocks.releaseWorkspaceDMReservation).toHaveBeenCalledWith(
+      "workspace_1",
+      periodStart
+    );
+    expect(mocks.queueAdd).toHaveBeenCalledWith(
+      "process-message",
+      expect.objectContaining({
+        automationId: "automation_1",
+        requeueAttempt: 1,
+        humanDelayApplied: true,
+      }),
+      expect.objectContaining({ delay: 1_800_000 })
+    );
+  });
+
+  it("defers a keyword DM by the campaign's human delay", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, humanDelayMinSeconds: 5, humanDelayMaxSeconds: 5 },
+    ]);
+
+    await processMessage(job());
+
+    expect(mocks.sendRevealDirectMessage).not.toHaveBeenCalled();
+    expect(mocks.queueAdd).toHaveBeenCalledWith(
+      "process-message",
+      expect.objectContaining({ automationId: "automation_1", humanDelayApplied: true }),
+      expect.objectContaining({ delay: 5000 })
     );
   });
 });

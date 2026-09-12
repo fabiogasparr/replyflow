@@ -17,6 +17,11 @@ import {
 // immediately), so never cache it at the route or CDN layer.
 export const dynamic = "force-dynamic";
 
+// A swapped min/max is a typo, not an error: store them ordered.
+function orderHumanDelay(min: number, max: number) {
+  return min <= max ? { min, max } : { min: max, max: min };
+}
+
 const createAutomationSchema = z
   .object({
     name: z.string().min(1).max(100),
@@ -30,6 +35,12 @@ const createAutomationSchema = z
     matchAnyWord: z.boolean().optional().default(false),
     dmTriggerEnabled: z.boolean().optional().default(false),
     dmMessage: z.string().min(1).max(1000),
+    // Extra wordings of the link DM, one picked per send (see lib/messaging).
+    dmMessages: z.array(z.string().max(1000)).max(10).optional().default([]),
+    // Random wait, in seconds, before replying. Capped at 15 minutes so the
+    // private reply still lands well inside Instagram's window.
+    humanDelayMinSeconds: z.number().int().min(0).max(900).optional().default(0),
+    humanDelayMaxSeconds: z.number().int().min(0).max(900).optional().default(0),
     openingDmEnabled: z.boolean().optional().default(false),
     openingDmMessage: z.string().max(1000).optional().nullable(),
     openingDmButtonLabel: z.string().max(64).optional().nullable(),
@@ -93,6 +104,9 @@ const updateAutomationSchema = z.object({
   matchAnyWord: z.boolean().optional(),
   dmTriggerEnabled: z.boolean().optional(),
   dmMessage: z.string().min(1).max(1000).optional(),
+  dmMessages: z.array(z.string().max(1000)).max(10).optional(),
+  humanDelayMinSeconds: z.number().int().min(0).max(900).optional(),
+  humanDelayMaxSeconds: z.number().int().min(0).max(900).optional(),
   openingDmEnabled: z.boolean().optional(),
   openingDmMessage: z.string().max(1000).optional().nullable(),
   openingDmButtonLabel: z.string().max(64).optional().nullable(),
@@ -372,6 +386,13 @@ export async function POST(request: NextRequest) {
   )
     .map((m) => m.trim())
     .filter(Boolean);
+  const dmVariations = parsed.data.dmMessages
+    .map((m) => m.trim())
+    .filter((m) => m && m !== parsed.data.dmMessage.trim());
+  const humanDelay = orderHumanDelay(
+    parsed.data.humanDelayMinSeconds,
+    parsed.data.humanDelayMaxSeconds
+  );
 
   const automation = await prisma.automation.create({
     data: {
@@ -386,6 +407,9 @@ export async function POST(request: NextRequest) {
       matchAnyWord,
       dmTriggerEnabled: parsed.data.dmTriggerEnabled,
       dmMessage: parsed.data.dmMessage,
+      dmMessages: dmVariations,
+      humanDelayMinSeconds: humanDelay.min,
+      humanDelayMaxSeconds: humanDelay.max,
       openingDmEnabled,
       openingDmMessage: openingDmEnabled
         ? parsed.data.openingDmMessage || null
@@ -513,6 +537,23 @@ export async function PATCH(request: NextRequest) {
   if (automationData.matchAnyPost === true || automationData.pendingNextReel === true) {
     automationData.postId = null;
     automationData.postUrl = null;
+  }
+  if (automationData.dmMessages !== undefined) {
+    const primary = (automationData.dmMessage ?? existing.dmMessage).trim();
+    automationData.dmMessages = automationData.dmMessages
+      .map((m) => m.trim())
+      .filter((m) => m && m !== primary);
+  }
+  if (
+    automationData.humanDelayMinSeconds !== undefined ||
+    automationData.humanDelayMaxSeconds !== undefined
+  ) {
+    const ordered = orderHumanDelay(
+      automationData.humanDelayMinSeconds ?? existing.humanDelayMinSeconds,
+      automationData.humanDelayMaxSeconds ?? existing.humanDelayMaxSeconds
+    );
+    automationData.humanDelayMinSeconds = ordered.min;
+    automationData.humanDelayMaxSeconds = ordered.max;
   }
   // Keep the public-reply variations list and the legacy single field in sync.
   if (automationData.publicReplyMessages !== undefined) {

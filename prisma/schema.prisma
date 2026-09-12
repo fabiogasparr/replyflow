@@ -402,6 +402,16 @@ model Automation {
   // postId / matchAnyPost do not apply to it.
   dmTriggerEnabled        Boolean   @default(false)
   dmMessage               String
+  // Optional variations of the link DM. One is picked at send time (never the
+  // same one twice in a row for a campaign) so DMs do not look identical.
+  // dmMessage stays the first/legacy variation. Every message field also
+  // accepts spintax: "{oi|olá|e aí}" expands to one option per send.
+  dmMessages              String[]  @default([])
+  // "Human delay": wait a random number of seconds in [min, max] before the
+  // public reply and the DM go out, so replies do not land the same second the
+  // comment was posted. 0/0 disables it.
+  humanDelayMinSeconds    Int       @default(0)
+  humanDelayMaxSeconds    Int       @default(0)
   openingDmEnabled        Boolean   @default(false)
   openingDmMessage        String?
   openingDmButtonLabel    String?

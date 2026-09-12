@@ -131,6 +131,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
       case 368:
       case 4:
       case 17:
+      case 32: // page-level request throttle
+      case 613: // custom rate limit (Instagram messaging / comments)
         throw new RateLimitError(message, traceId);
       case 10:
       case 100:

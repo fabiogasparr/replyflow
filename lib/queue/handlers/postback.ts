@@ -14,6 +14,8 @@ import {
   recordAutomationSuccess,
 } from "@/lib/automations/operational-state";
 import { renderMessageWithoutLink } from "@/lib/tracking/message";
+import { reserveDMSlot } from "@/lib/utils/rate-limiter";
+import { resolveMessageText, waitForSendSlot } from "@/lib/messaging/pacing";
 import {
   FOLLOWUP_JOB_NAME,
   getDMQueue,
@@ -29,6 +31,7 @@ import {
   DEFAULT_FOLLOW_PROMPT_MESSAGE,
   INVALID_INSTAGRAM_TOKEN_ERROR,
   MISSING_INSTAGRAM_TOKEN_ERROR,
+  hourlyDmLimitError,
   monthlyDmLimitError,
 } from "../user-facing-copy";
 
@@ -125,10 +128,15 @@ export async function processPostback(
       if (fallback) return;
       const promptText = renderMessageWithoutLink({
         message:
-          automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE,
+          (await resolveMessageText(
+            automation.id,
+            "followPrompt",
+            automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE
+          )) ?? DEFAULT_FOLLOW_PROMPT_MESSAGE,
         commenterName,
       });
       try {
+        await waitForSendSlot(instagramAccountId);
         await sendDirectMessageWithButton(
           accessToken,
           automation.instagramAccount.instagramId,
@@ -174,10 +182,57 @@ export async function processPostback(
     return;
   }
 
+  // Button taps share the account's hourly DM ceiling. A tap that finds the
+  // bucket full is not retried later (the person can simply tap again).
+  const rateLimit = await reserveDMSlot(instagramAccountId, Number.MAX_SAFE_INTEGER);
+  if (!rateLimit.allowed) {
+    await releaseWorkspaceDMReservation(
+      automation.workspaceId,
+      usage.periodStart
+    );
+    if (!fallback) {
+      await prisma.dmLog.upsert({
+        where: {
+          automationId_commentId: {
+            automationId: automation.id,
+            commentId: dedupeId,
+          },
+        },
+        create: {
+          ...postbackReplayData,
+          workspaceId: automation.workspaceId,
+          automationId: automation.id,
+          instagramAccountId: automation.instagramAccountId,
+          commenterId: userId,
+          commenterName,
+          commentText: BUTTON_TAP_LOG_TEXT,
+          commentId: dedupeId,
+          status: "SKIPPED_RATE_LIMIT",
+          errorMessage: hourlyDmLimitError,
+        },
+        update: {
+          ...postbackReplayData,
+          status: "SKIPPED_RATE_LIMIT",
+          errorMessage: hourlyDmLimitError,
+        },
+      });
+    }
+    return;
+  }
+
+  const dmText =
+    (await resolveMessageText(
+      automation.id,
+      "dm",
+      automation.dmMessage,
+      automation.dmMessages
+    )) ?? automation.dmMessage;
+
   try {
+    await waitForSendSlot(instagramAccountId);
     await sendRevealDirectMessage(
       accessToken,
-      automation,
+      { ...automation, dmMessage: dmText },
       userId,
       commenterName,
       "postback"

@@ -22,6 +22,11 @@ import {
   renderMessageWithTracking,
   renderMessageWithoutLink,
 } from "@/lib/tracking/message";
+import {
+  pickHumanDelayMs,
+  resolveMessageText,
+  waitForSendSlot,
+} from "@/lib/messaging/pacing";
 import { getDMQueue, type ProcessCommentJob } from "../client";
 import {
   buildInlineLinkFallback,
@@ -158,6 +163,48 @@ export async function processComment(
       continue;
     }
 
+    // Human delay: instead of answering the same second the comment landed,
+    // park this campaign's work in a delayed job. The row is created now so
+    // the comment shows up as pending in the history while it waits. Operator
+    // retries (automationId set) and jobs that already waited go straight on.
+    const humanDelayMs =
+      job.data.automationId || job.data.humanDelayApplied
+        ? 0
+        : pickHumanDelayMs(automation);
+    if (humanDelayMs > 0) {
+      if (!existingLog) {
+        await prisma.dmLog.create({
+          data: {
+            ...replayData,
+            workspaceId: automation.workspaceId,
+            automationId: automation.id,
+            instagramAccountId: automation.instagramAccountId,
+            commenterId,
+            commenterName,
+            commentText,
+            commentId,
+            matchedKeyword: matchResult.matchedKeyword,
+            status: "PENDING",
+            attempts: 0,
+          },
+        });
+      }
+      await getDMQueue().add(
+        "process-comment",
+        {
+          ...job.data,
+          automationId: automation.id,
+          matchedKeyword: matchResult.matchedKeyword,
+          humanDelayApplied: true,
+        },
+        {
+          delay: humanDelayMs,
+          jobId: `comment_${instagramAccountId}_${commentId}_${automation.id}_delayed`,
+        }
+      );
+      continue;
+    }
+
     if (!automation.instagramAccount.accessToken) {
       await prisma.dmLog.upsert({
         where: {
@@ -266,24 +313,22 @@ export async function processComment(
     // Public reply leg — decoupled from the DM and posted first so a DM failure
     // (e.g. a non-follower whose messaging is restricted) never suppresses it.
     // Idempotent across retries via publicReplySentAt.
-    const replyPool =
-      automation.publicReplyMessages.length > 0
-        ? automation.publicReplyMessages
-        : automation.publicReplyMessage
-          ? [automation.publicReplyMessage]
-          : [];
-    if (
-      automation.publicReplyEnabled &&
-      replyPool.length > 0 &&
-      !existingLog?.publicReplySentAt
-    ) {
+    const chosenPublicReply = automation.publicReplyEnabled
+      ? await resolveMessageText(
+          automation.id,
+          "publicReply",
+          automation.publicReplyMessage,
+          automation.publicReplyMessages
+        )
+      : null;
+    if (chosenPublicReply && !existingLog?.publicReplySentAt) {
       try {
-        const chosen = replyPool[Math.floor(Math.random() * replyPool.length)];
         const publicReply = renderMessageWithTracking({
-          message: chosen,
+          message: chosenPublicReply,
           commenterName,
           trackedLinks: automation.trackedLinks,
         });
+        await waitForSendSlot(instagramAccountId);
         await sendCommentReply(accessToken, commentId, publicReply);
         await prisma.dmLog.update({
           where: {
@@ -460,6 +505,29 @@ export async function processComment(
       sendFollowPrompt = alreadyFollows !== true;
     }
 
+    // Pick this send's wording (variation list + spintax) before touching Meta.
+    const dmText =
+      (await resolveMessageText(
+        automation.id,
+        "dm",
+        automation.dmMessage,
+        automation.dmMessages
+      )) ?? automation.dmMessage;
+    const openingDmText = useOpeningDm
+      ? ((await resolveMessageText(
+          automation.id,
+          "openingDm",
+          automation.openingDmMessage
+        )) ?? (automation.openingDmMessage as string))
+      : null;
+    const followPromptText = sendFollowPrompt
+      ? ((await resolveMessageText(
+          automation.id,
+          "followPrompt",
+          automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE
+        )) ?? DEFAULT_FOLLOW_PROMPT_MESSAGE)
+      : null;
+
     // Persist this immediately before the first private-delivery call. If the
     // process loses the Meta response, later BullMQ/manual retries stop here
     // instead of risking the one private reply allowed for a comment.
@@ -471,9 +539,10 @@ export async function processComment(
     });
 
     try {
+      await waitForSendSlot(instagramAccountId);
       if (useOpeningDm) {
         const openingText = renderMessageWithTracking({
-          message: automation.openingDmMessage as string,
+          message: openingDmText as string,
           commenterName,
           trackedLinks: [],
         });
@@ -489,8 +558,7 @@ export async function processComment(
         );
       } else if (sendFollowPrompt) {
         const promptText = renderMessageWithoutLink({
-          message:
-            automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE,
+          message: followPromptText as string,
           commenterName,
         });
         await sendPrivateReplyWithButton(
@@ -506,7 +574,7 @@ export async function processComment(
         // Try button template first; if Meta rejects it, fall back to inline links.
         const bodyText =
           renderMessageWithoutLink({
-            message: automation.dmMessage,
+            message: dmText,
             commenterName,
           }) || DEFAULT_LINK_MESSAGE;
         const buttons = buildLinkButtons(
@@ -533,7 +601,7 @@ export async function processComment(
             formatError(buttonError)
           );
           const fallbackMessage = buildInlineLinkFallback(
-            automation.dmMessage,
+            dmText,
             commenterName,
             automation.trackedLinks,
             bodyText
@@ -554,7 +622,7 @@ export async function processComment(
         }
       } else {
         const dmMessage = renderMessageWithTracking({
-          message: automation.dmMessage,
+          message: dmText,
           commenterName,
           trackedLinks: automation.trackedLinks,
         });

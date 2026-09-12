@@ -46,6 +46,9 @@ interface LoadedCampaign {
   matchAnyWord: boolean;
   dmTriggerEnabled: boolean;
   dmMessage: string;
+  dmMessages?: string[];
+  humanDelayMinSeconds?: number | null;
+  humanDelayMaxSeconds?: number | null;
   openingDmEnabled: boolean;
   openingDmMessage: string | null;
   openingDmButtonLabel: string | null;
@@ -177,6 +180,12 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
   const [openingDmButtonLabel, setOpeningDmButtonLabel] = useState("");
 
   const [dmMessage, setDmMessage] = useState("");
+  const [dmVariations, setDmVariations] = useState<string[]>([]);
+  // New campaigns start with a small random wait so replies do not land the
+  // same second as the comment; existing ones keep whatever they had.
+  const [humanDelayEnabled, setHumanDelayEnabled] = useState(mode === "new");
+  const [humanDelayMin, setHumanDelayMin] = useState(20);
+  const [humanDelayMax, setHumanDelayMax] = useState(90);
   const [linkOpen, setLinkOpen] = useState(false);
   const [trackedDestinationUrl, setTrackedDestinationUrl] = useState("");
   const [linkButtonLabel, setLinkButtonLabel] = useState("Abrir link");
@@ -291,6 +300,13 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         setOpeningDmMessage(c.openingDmMessage ?? "");
         setOpeningDmButtonLabel(c.openingDmButtonLabel ?? "");
         setDmMessage(c.dmMessage);
+        setDmVariations(c.dmMessages ?? []);
+        const delayMax = c.humanDelayMaxSeconds ?? 0;
+        setHumanDelayEnabled(delayMax > 0);
+        if (delayMax > 0) {
+          setHumanDelayMin(c.humanDelayMinSeconds ?? 0);
+          setHumanDelayMax(delayMax);
+        }
         setLinkButtonLabel(c.linkButtonLabel ?? "Abrir link");
         setIsActive(c.isActive);
         const link = c.trackedLinks?.[0]?.destinationUrl ?? "";
@@ -584,6 +600,9 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       keywords: matchMode === "any" ? [] : keywords,
       dmTriggerEnabled,
       dmMessage,
+      dmMessages: dmVariations.map((m) => m.trim()).filter(Boolean),
+      humanDelayMinSeconds: humanDelayEnabled ? Math.min(humanDelayMin, humanDelayMax) : 0,
+      humanDelayMaxSeconds: humanDelayEnabled ? Math.max(humanDelayMin, humanDelayMax) : 0,
       openingDmEnabled,
       openingDmMessage: openingDmEnabled ? openingDmMessage : null,
       openingDmButtonLabel: openingDmEnabled ? openingDmButtonLabel : null,
@@ -1016,9 +1035,60 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 </button>
               )}
               <p className="text-xs text-muted">
-                Uma resposta é escolhida aleatoriamente para que os comentários
-                não pareçam idênticos.
+                Uma resposta é escolhida aleatoriamente (nunca a mesma duas
+                vezes seguidas) para que os comentários não pareçam idênticos.
+                Dentro de qualquer mensagem, {"{oi|olá|e aí}"} sorteia uma das
+                opções a cada envio.
               </p>
+              </div>
+            )}
+          </div>
+          <div id="flow-step-human-delay" className="scroll-mt-6 space-y-3">
+            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+              <span className="text-sm text-foreground">
+                esperar alguns segundos antes de responder (ritmo humano)
+              </span>
+              <Toggle
+                on={humanDelayEnabled}
+                onToggle={() => setHumanDelayEnabled(!humanDelayEnabled)}
+              />
+            </div>
+            {humanDelayEnabled && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                  <span className="text-xs text-muted">Entre</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={900}
+                    value={humanDelayMin}
+                    onChange={(e) =>
+                      setHumanDelayMin(
+                        Math.max(0, Math.min(900, Math.floor(Number(e.target.value) || 0)))
+                      )
+                    }
+                    className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-sm text-foreground focus:border-accent/40 focus:outline-none"
+                  />
+                  <span className="text-xs text-muted">e</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={900}
+                    value={humanDelayMax}
+                    onChange={(e) =>
+                      setHumanDelayMax(
+                        Math.max(0, Math.min(900, Math.floor(Number(e.target.value) || 0)))
+                      )
+                    }
+                    className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-sm text-foreground focus:border-accent/40 focus:outline-none"
+                  />
+                  <span className="text-xs text-muted">segundos</span>
+                </div>
+                <p className="text-xs text-muted">
+                  A resposta pública e a DM saem depois de um tempo sorteado
+                  nesse intervalo, como uma pessoa responderia. Máximo de 15
+                  minutos.
+                </p>
               </div>
             )}
           </div>
@@ -1153,8 +1223,52 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               </button>
             )}
             <p className="text-xs text-muted">
-              {"{link}"} insere o link rastreado; {"{username}"} personaliza a mensagem.
+              {"{link}"} insere o link rastreado; {"{username}"} personaliza a mensagem;
+              {" {oi|olá|e aí}"} sorteia uma opção a cada envio.
             </p>
+            <div className="space-y-2 border-t border-border pt-2">
+              {dmVariations.map((msg, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <textarea
+                    value={msg}
+                    onChange={(e) =>
+                      setDmVariations((prev) =>
+                        prev.map((m, idx) => (idx === i ? e.target.value : m))
+                      )
+                    }
+                    placeholder={`Variação ${i + 2} da DM`}
+                    rows={2}
+                    maxLength={1000}
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none resize-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDmVariations((prev) => prev.filter((_, idx) => idx !== i))
+                    }
+                    className="shrink-0 px-2 py-2 text-muted hover:text-error"
+                    aria-label="Remover variação"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {dmVariations.length < 9 && (
+                <button
+                  type="button"
+                  onClick={() => setDmVariations((prev) => [...prev, ""])}
+                  className="text-xs font-medium text-accent hover:underline"
+                >
+                  + Adicionar uma variação da DM
+                </button>
+              )}
+              {dmVariations.length > 0 && (
+                <p className="text-xs text-muted">
+                  Cada envio usa uma das variações (a mensagem acima é a
+                  primeira), sem repetir a última usada.
+                </p>
+              )}
+            </div>
           </div>
           <div id="flow-step-follow-up" className="scroll-mt-6 mt-3 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between">

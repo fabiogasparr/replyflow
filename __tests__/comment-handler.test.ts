@@ -236,4 +236,80 @@ describe("comment queue handler", () => {
       error
     );
   });
+
+  it("parks the campaign in a delayed job when a human delay is configured", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, humanDelayMinSeconds: 20, humanDelayMaxSeconds: 90 },
+    ]);
+
+    await processComment(job());
+
+    // The row exists (pending) so the comment is visible while it waits…
+    expect(mocks.dmLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "PENDING", commentId: "comment_1" }),
+      })
+    );
+    // …the work is re-enqueued for this campaign only, inside the window…
+    expect(mocks.queueAdd).toHaveBeenCalledTimes(1);
+    const [name, data, options] = mocks.queueAdd.mock.calls[0];
+    expect(name).toBe("process-comment");
+    expect(data).toMatchObject({
+      automationId: "automation_1",
+      matchedKeyword: "preço",
+      humanDelayApplied: true,
+      commentId: "comment_1",
+    });
+    expect(options.delay).toBeGreaterThanOrEqual(20_000);
+    expect(options.delay).toBeLessThanOrEqual(90_000);
+    expect(options.jobId).toBe("comment_business_1_comment_1_automation_1_delayed");
+    // …and nothing reaches Meta yet.
+    expect(mocks.sendPrivateReply).not.toHaveBeenCalled();
+    expect(mocks.reserveWorkspaceDMSend).not.toHaveBeenCalled();
+  });
+
+  it("sends without waiting again once the delayed job runs", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, humanDelayMinSeconds: 20, humanDelayMaxSeconds: 90 },
+    ]);
+    mocks.dmLogFindUnique.mockResolvedValue({ status: "PENDING", publicReplySentAt: null });
+
+    await processComment(
+      job({ automationId: "automation_1", matchedKeyword: "preço", humanDelayApplied: true })
+    );
+
+    expect(mocks.queueAdd).not.toHaveBeenCalled();
+    expect(mocks.sendPrivateReply).toHaveBeenCalledTimes(1);
+  });
+
+  it("rotates DM variations and expands spintax before sending", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      {
+        ...configuredAutomation,
+        dmMessage: "{Oi|Olá} {username}!",
+        dmMessages: [],
+      },
+    ]);
+
+    await processComment(job());
+
+    const sent = mocks.sendPrivateReply.mock.calls[0][3] as string;
+    expect(["Oi Bia!", "Olá Bia!"]).toContain(sent);
+  });
+
+  it("picks the public reply from the variations list", async () => {
+    mocks.sendCommentReply.mockResolvedValue({});
+    mocks.automationFindMany.mockResolvedValue([
+      {
+        ...configuredAutomation,
+        publicReplyEnabled: true,
+        publicReplyMessages: ["Te chamei no direct!", "Olha a DM 📩"],
+      },
+    ]);
+
+    await processComment(job());
+
+    const reply = mocks.sendCommentReply.mock.calls[0][2] as string;
+    expect(["Te chamei no direct!", "Olha a DM 📩"]).toContain(reply);
+  });
 });

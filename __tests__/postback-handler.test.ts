@@ -45,6 +45,17 @@ vi.mock("@/lib/queue/client", () => ({
   FOLLOWUP_JOB_NAME: "process-followup",
   getDMQueue: () => ({ add: mocks.queueAdd }),
 }));
+vi.mock("@/lib/utils/rate-limiter", () => ({
+  reserveDMSlot: vi.fn(async () => ({
+    allowed: true,
+    currentCount: 1,
+    remainingDMs: 749,
+    shouldRequeue: false,
+    requeueDelayMs: 0,
+    shouldSkip: false,
+    reserved: true,
+  })),
+}));
 vi.mock("@/lib/queue/delivery", () => ({
   formatWorkerError: (error: unknown) =>
     error instanceof Error ? error.message : "Unknown error",

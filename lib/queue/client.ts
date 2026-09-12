@@ -38,6 +38,9 @@ export interface ProcessCommentJob {
   // from. Campaigns are bound to that post, so both ids have to be matched.
   originalMediaId?: string;
   requeueAttempt?: number;
+  // Set once the campaign's random "human delay" has been served: the job was
+  // re-enqueued with that delay and must now send without waiting again.
+  humanDelayApplied?: boolean;
   // Which path enqueued this comment. Recorded in the shared ProcessedComment
   // dedup store so the reconciler can tell webhook- from polling-caught comments.
   source?: CommentSource;
@@ -71,6 +74,8 @@ export interface ProcessMessageJob {
   messageText: string;
   senderId: string;
   matchedKeyword?: string | null;
+  humanDelayApplied?: boolean;
+  requeueAttempt?: number;
 }
 
 export type DmQueueJob =

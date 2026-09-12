@@ -46,7 +46,8 @@ describe("sign-in email", () => {
     sendMail.mockResolvedValue({ rejected: [], pending: [] });
     await sendSmtpVerification(smtpParams);
     expect(sendMail).toHaveBeenCalledWith({
-      to: smtpParams.identifier, from: smtpParams.provider.from, ...buildSignInEmail(smtpParams.url),
+      to: { name: "", address: smtpParams.identifier }, from: smtpParams.provider.from,
+      disableFileAccess: true, disableUrlAccess: true, ...buildSignInEmail(smtpParams.url),
     });
     sendMail.mockResolvedValue({ rejected: [smtpParams.identifier] });
     await expect(sendSmtpVerification(smtpParams)).rejects.toThrow("Não foi possível enviar");
@@ -83,5 +84,15 @@ describe("sign-in email", () => {
       })
     ).rejects.toThrow("não está configurado");
     expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("rejects recipient lists before either transport can interpret them", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const identifier = "owner@example.com,other@example.com";
+    await expect(sendSmtpVerification({ ...smtpParams, identifier })).rejects.toThrow("único endereço");
+    await expect(sendResendVerification({ ...params, identifier })).rejects.toThrow("único endereço");
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

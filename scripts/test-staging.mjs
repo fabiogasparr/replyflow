@@ -27,6 +27,11 @@ function client() {
     for (const cookie of response.headers.getSetCookie()) {
       const pair = cookie.split(';', 1)[0];
       const equal = pair.indexOf('=');
+      if (pair.slice(0, equal).endsWith('session-token') && base.protocol === 'https:') {
+        assert.ok(/;\s*Secure(?:;|$)/i.test(cookie), 'Sessão pública deve usar cookie Secure.');
+        assert.ok(/;\s*HttpOnly(?:;|$)/i.test(cookie), 'Sessão não pode ser acessível ao JavaScript.');
+        assert.ok(/;\s*SameSite=Lax(?:;|$)/i.test(cookie), 'Sessão deve manter proteção SameSite.');
+      }
       cookies.set(pair.slice(0, equal), pair.slice(equal + 1));
     }
     return response;
@@ -56,6 +61,24 @@ async function login(email) {
   assert.equal(stats.success, true, 'Painel integrado ao banco.');
   assert.equal(stats.data.workspace.billingReady, true, 'Workspace novo recebe assinatura e limites.');
   return request;
+}
+
+// Malformed recipient syntax must never reach SMTP, even when its first
+// address is allowlisted. This exercises Auth.js normalization, not just helpers.
+for (const email of ['tester@replyflow.test,blocked@replyflow.test', 'Tester <tester@replyflow.test>', 'tester@replyflow.test(comment)']) {
+  const request = client();
+  const csrf = await (await request('/api/auth/csrf')).json();
+  const before = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  assert.equal(typeof before.total, 'number', 'Mailpit deve informar a contagem antes da tentativa.');
+  const response = await request('/api/auth/signin/nodemailer', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ csrfToken: csrf.csrfToken, email, callbackUrl: `${base.origin}/dashboard` }),
+  });
+  const target = new URL(response.headers.get('location'), base);
+  assert.ok(target.searchParams.has('error'), 'Sintaxe ambígua deve ser rejeitada no fluxo real de login.');
+  const after = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  assert.equal(typeof after.total, 'number', 'Mailpit deve informar a contagem após a tentativa.');
+  assert.equal(after.total, before.total, 'Tentativa inválida não pode gerar e-mail. Execute sem logins concorrentes.');
 }
 
 const first = await login('tester@replyflow.test');
@@ -88,5 +111,5 @@ if (!env.INSTAGRAM_APP_ID) {
   const wizardConnect = await first(`/api/instagram/connect?flow=wizard&workspaceId=${encodeURIComponent(firstOnboarding.workspace.id)}`);
   assert.equal(new URL(wizardConnect.headers.get('location')).pathname, '/settings/instagram', 'Falha de configuração retorna ao wizard.');
 }
-console.log('✓ HTTPS/HTTP, saúde, login por e-mail, dois tenants, assinatura Free, wizard e isolamento real aprovados.');
+console.log('✓ HTTPS/HTTP, saúde, rejeição de destinatários ambíguos, login por e-mail, dois tenants, assinatura Free, wizard e isolamento real aprovados.');
 console.log('Nenhuma mensagem foi enviada ao Instagram. E-mails capturados somente no Mailpit.');

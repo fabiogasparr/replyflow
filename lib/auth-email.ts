@@ -1,5 +1,6 @@
 import { createTransport } from "nodemailer";
 import type { NodemailerConfig } from "next-auth/providers/nodemailer";
+import { normalizeAuthEmail } from "@/lib/auth-email-address";
 import {
   hasUsableEmailSender,
   hasUsableResendKey,
@@ -37,6 +38,7 @@ export function buildSignInEmail(url: string) {
 }
 
 export const sendSmtpVerification: NodemailerConfig["sendVerificationRequest"] = async ({ identifier, url, provider }) => {
+  const recipient = normalizeAuthEmail(identifier);
   if (
     !hasUsableEmailSender(provider.from) ||
     typeof provider.server !== "string" ||
@@ -46,8 +48,10 @@ export const sendSmtpVerification: NodemailerConfig["sendVerificationRequest"] =
   }
   const transport = createTransport(provider.server);
   const result = await transport.sendMail({
-    to: identifier,
+    to: { name: "", address: recipient },
     from: provider.from,
+    disableFileAccess: true,
+    disableUrlAccess: true,
     ...buildSignInEmail(url),
   });
   if ([...(result.rejected ?? []), ...(result.pending ?? [])].filter(Boolean).length) {
@@ -56,6 +60,7 @@ export const sendSmtpVerification: NodemailerConfig["sendVerificationRequest"] =
 };
 
 export const sendResendVerification: NodemailerConfig["sendVerificationRequest"] = async ({ identifier, url, provider }) => {
+  const recipient = normalizeAuthEmail(identifier);
   if (
     !hasUsableEmailSender(provider.from) ||
     !hasUsableResendKey(provider.apiKey)
@@ -70,7 +75,7 @@ export const sendResendVerification: NodemailerConfig["sendVerificationRequest"]
     },
     body: JSON.stringify({
       from: provider.from,
-      to: identifier,
+      to: recipient,
       ...buildSignInEmail(url),
     }),
   });

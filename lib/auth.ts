@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/client";
 import { ensureWorkspaceForUser, getActiveWorkspace } from "@/lib/workspace";
 import { isEmailAllowedToSignIn } from "@/lib/env";
 import { sendResendVerification, sendSmtpVerification } from "@/lib/auth-email";
+import { normalizeAuthEmail } from "@/lib/auth-email-address";
 
 type AdapterPrismaClient = Parameters<typeof PrismaAdapter>[0];
 
@@ -25,10 +26,11 @@ export const authConfig = {
   adapter: PrismaAdapter(prisma as unknown as AdapterPrismaClient),
   providers: [
     smtpServer
-      ? Nodemailer({ server: smtpServer, from: emailFrom, sendVerificationRequest: sendSmtpVerification })
+      ? Nodemailer({ server: smtpServer, from: emailFrom, normalizeIdentifier: normalizeAuthEmail, sendVerificationRequest: sendSmtpVerification })
       : Resend({
           apiKey: process.env.RESEND_API_KEY ?? "missing-resend-api-key",
           from: emailFrom,
+          normalizeIdentifier: normalizeAuthEmail,
           sendVerificationRequest: sendResendVerification,
         }),
   ],

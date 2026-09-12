@@ -41,6 +41,9 @@ export interface ProcessCommentJob {
   // Set once the campaign's random "human delay" has been served: the job was
   // re-enqueued with that delay and must now send without waiting again.
   humanDelayApplied?: boolean;
+  // Set by an operator reprocess. Skips the AI sentiment triage so a comment
+  // held for human review can be released deliberately.
+  approvedByOperator?: boolean;
   // Which path enqueued this comment. Recorded in the shared ProcessedComment
   // dedup store so the reconciler can tell webhook- from polling-caught comments.
   source?: CommentSource;
@@ -75,6 +78,7 @@ export interface ProcessMessageJob {
   senderId: string;
   matchedKeyword?: string | null;
   humanDelayApplied?: boolean;
+  approvedByOperator?: boolean;
   requeueAttempt?: number;
 }
 

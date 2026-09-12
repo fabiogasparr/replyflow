@@ -412,6 +412,16 @@ model Automation {
   // comment was posted. 0/0 disables it.
   humanDelayMinSeconds    Int       @default(0)
   humanDelayMaxSeconds    Int       @default(0)
+  // AI assistance (lib/ai). Personalised wording is generated from the actual
+  // comment text and aiInstructions (persona, offer, tone); the templates
+  // above stay as the fallback whenever the model is unavailable.
+  aiPublicReplyEnabled    Boolean   @default(false)
+  aiDmEnabled             Boolean   @default(false)
+  aiInstructions          String?
+  // Sentiment triage: negative or derogatory comments are parked for a human
+  // (DmLog SKIPPED_HUMAN_REVIEW) instead of receiving an automatic reply.
+  aiModerationEnabled     Boolean   @default(false)
+  aiModerationSensitivity String    @default("HOSTILE")
   openingDmEnabled        Boolean   @default(false)
   openingDmMessage        String?
   openingDmButtonLabel    String?
@@ -502,6 +512,13 @@ model DmLog {
   // retries; a DM failure never blocks or re-posts the public reply.
   publicReplySentAt DateTime?
   publicReplyError  String?
+
+  // What the AI concluded about the trigger text, when a campaign asked for
+  // it: the sentiment label, why it was held for a human, and the wording it
+  // wrote (kept for audit even after the send).
+  aiSentiment      String?
+  aiReviewReason   String?
+  aiGeneratedReply String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -712,6 +729,7 @@ enum DmStatus {
   SKIPPED_RATE_LIMIT
   SKIPPED_PLAN_LIMIT
   SKIPPED_NO_MATCH
+  SKIPPED_HUMAN_REVIEW
 }
 
 enum DmTriggerType {

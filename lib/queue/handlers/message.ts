@@ -22,6 +22,12 @@ import {
   waitForSendSlot,
 } from "@/lib/messaging/pacing";
 import {
+  assessComment,
+  generatePersonalizedDm,
+  humanReviewMessage,
+  shouldHoldForHuman,
+} from "@/lib/ai/comment-intelligence";
+import {
   FOLLOWUP_JOB_NAME,
   MESSAGE_JOB_NAME,
   getDMQueue,
@@ -118,7 +124,9 @@ export async function processMessage(
     // of the job must not send a second DM.
     if (
       existingLog?.status === "SENT" ||
-      existingLog?.status === "SKIPPED_PLAN_LIMIT"
+      existingLog?.status === "SKIPPED_PLAN_LIMIT" ||
+      (existingLog?.status === "SKIPPED_HUMAN_REVIEW" &&
+        !job.data.approvedByOperator)
     ) {
       continue;
     }
@@ -225,6 +233,58 @@ export async function processMessage(
     });
     const commenterName = priorLog?.commenterName ?? null;
 
+    const aiContext = {
+      brandUsername: automation.instagramAccount.username,
+      campaignName: automation.name,
+      campaignGoal: automation.goal,
+      instructions: automation.aiInstructions,
+      keywords: automation.keywords,
+    };
+    // AI triage: a hostile inbound DM is parked for a person instead of
+    // getting an automatic reply (an operator reprocess releases it).
+    if (automation.aiModerationEnabled && !job.data.approvedByOperator) {
+      const assessment = await assessComment(messageText, aiContext);
+      if (shouldHoldForHuman(assessment, automation.aiModerationSensitivity)) {
+        const reason = humanReviewMessage(assessment!);
+        const held = {
+          ...logBase,
+          commenterName,
+          status: "SKIPPED_HUMAN_REVIEW" as const,
+          aiSentiment: assessment!.sentiment,
+          aiReviewReason: reason,
+          errorMessage: reason,
+        };
+        await prisma.dmLog.upsert({
+          where: {
+            automationId_commentId: {
+              automationId: automation.id,
+              commentId: dedupeId,
+            },
+          },
+          create: held,
+          update: held,
+        });
+        await prisma.operationalEvent
+          .create({
+            data: {
+              workspaceId: automation.workspaceId,
+              source: "SYSTEM",
+              level: "WARNING",
+              message: `DM de @${commenterName ?? senderId} reservada para revisão humana na campanha "${automation.name}"`,
+              payload: {
+                automationId: automation.id,
+                messageId,
+                messageText: messageText.slice(0, 500),
+                sentiment: assessment!.sentiment,
+                reason,
+              },
+            },
+          })
+          .catch(() => {});
+        continue;
+      }
+    }
+
     // Follow gate: anyone not confirmed as a follower gets the prompt instead of
     // the link, with the same `followcheck:` button that re-verifies on tap.
     // `null` (unverifiable) prompts too — this is first contact, exactly like a
@@ -314,13 +374,23 @@ export async function processMessage(
           automation.followPromptMessage || DEFAULT_FOLLOW_PROMPT_MESSAGE
         )) ?? DEFAULT_FOLLOW_PROMPT_MESSAGE)
       : null;
-    const dmText =
+    const templateDmText =
       (await resolveMessageText(
         automation.id,
         "dm",
         automation.dmMessage,
         automation.dmMessages
       )) ?? automation.dmMessage;
+    const dmText =
+      automation.aiDmEnabled && !sendFollowPrompt
+        ? ((await generatePersonalizedDm({
+            commentText: messageText,
+            commenterName,
+            template: templateDmText,
+            hasLink: automation.trackedLinks.length > 0,
+            context: aiContext,
+          })) ?? templateDmText)
+        : templateDmText;
 
     const deliveryAttemptedAt = new Date();
     await prisma.dmLog.upsert({

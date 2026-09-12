@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   dmLogUpdate: vi.fn(),
   dmLogUpsert: vi.fn(),
   dmLogUpdateMany: vi.fn(),
+  operationalEventCreate: vi.fn(),
   decryptToken: vi.fn(),
   matchKeywords: vi.fn(),
   reserveDMSlot: vi.fn(),
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/db/client", () => ({
   prisma: {
+    operationalEvent: { create: mocks.operationalEventCreate },
     automation: { findMany: mocks.automationFindMany },
     dmLog: {
       findUnique: mocks.dmLogFindUnique,
@@ -62,6 +64,22 @@ vi.mock("@/lib/meta/client", () => ({
 vi.mock("@/lib/queue/client", () => ({
   getDMQueue: () => ({ add: mocks.queueAdd }),
 }));
+const ai = vi.hoisted(() => ({
+  assessComment: vi.fn(),
+  generatePersonalizedPublicReply: vi.fn(),
+  generatePersonalizedDm: vi.fn(),
+}));
+vi.mock("@/lib/ai/comment-intelligence", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/ai/comment-intelligence")>(
+    "@/lib/ai/comment-intelligence"
+  );
+  return {
+    ...actual,
+    assessComment: ai.assessComment,
+    generatePersonalizedPublicReply: ai.generatePersonalizedPublicReply,
+    generatePersonalizedDm: ai.generatePersonalizedDm,
+  };
+});
 vi.mock("@/lib/queue/delivery", () => ({
   buildInlineLinkFallback: vi.fn(),
   buildWorkerLinkButtons: vi.fn(),
@@ -91,8 +109,14 @@ const configuredAutomation = {
   followPromptButtonLabel: null,
   dmMessage: "Oi, {username}!",
   linkButtonLabel: null,
+  aiPublicReplyEnabled: false,
+  aiDmEnabled: false,
+  aiInstructions: null,
+  aiModerationEnabled: false,
+  aiModerationSensitivity: "HOSTILE",
   instagramAccount: {
     instagramId: "business_1",
+    username: "marca",
     accessToken: "encrypted-token",
   },
   workspace: { id: "workspace_1" },
@@ -130,6 +154,10 @@ beforeEach(() => {
   });
   mocks.reserveDMSlot.mockResolvedValue({ allowed: true });
   mocks.sendPrivateReply.mockResolvedValue({ message_id: "sent_1" });
+  mocks.operationalEventCreate.mockResolvedValue({});
+  ai.assessComment.mockResolvedValue(null);
+  ai.generatePersonalizedPublicReply.mockResolvedValue(null);
+  ai.generatePersonalizedDm.mockResolvedValue(null);
 });
 
 describe("comment queue handler", () => {
@@ -311,5 +339,104 @@ describe("comment queue handler", () => {
 
     const reply = mocks.sendCommentReply.mock.calls[0][2] as string;
     expect(["Te chamei no direct!", "Olha a DM 📩"]).toContain(reply);
+  });
+
+  it("holds a hostile comment for a person instead of replying", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, aiModerationEnabled: true, publicReplyEnabled: true, publicReplyMessages: ["Te chamei!"] },
+    ]);
+    ai.assessComment.mockResolvedValue({
+      sentiment: "NEGATIVE",
+      hostile: true,
+      needsHuman: false,
+      reason: "Ofende a marca",
+    });
+
+    await processComment(job());
+
+    expect(mocks.sendCommentReply).not.toHaveBeenCalled();
+    expect(mocks.sendPrivateReply).not.toHaveBeenCalled();
+    expect(mocks.reserveWorkspaceDMSend).not.toHaveBeenCalled();
+    expect(mocks.dmLogUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "SKIPPED_HUMAN_REVIEW",
+          aiSentiment: "NEGATIVE",
+          aiReviewReason: expect.stringContaining("ofensivo"),
+        }),
+      })
+    );
+    expect(mocks.operationalEventCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ workspaceId: "workspace_1", level: "WARNING" }),
+      })
+    );
+  });
+
+  it("never re-touches a held comment unless an operator approved it", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, aiModerationEnabled: true },
+    ]);
+    mocks.dmLogFindUnique.mockResolvedValue({ status: "SKIPPED_HUMAN_REVIEW" });
+
+    await processComment(job());
+    expect(mocks.sendPrivateReply).not.toHaveBeenCalled();
+
+    ai.assessComment.mockResolvedValue({ sentiment: "NEGATIVE", hostile: true, needsHuman: false, reason: "x" });
+    await processComment(job({ automationId: "automation_1", approvedByOperator: true, source: "MANUAL" }));
+    expect(ai.assessComment).not.toHaveBeenCalled();
+    expect(mocks.sendPrivateReply).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends normally when the triage has no opinion, and uses AI wording when available", async () => {
+    mocks.sendCommentReply.mockResolvedValue({});
+    mocks.automationFindMany.mockResolvedValue([
+      {
+        ...configuredAutomation,
+        aiModerationEnabled: true,
+        aiPublicReplyEnabled: true,
+        aiDmEnabled: true,
+        publicReplyEnabled: true,
+        publicReplyMessages: ["Te chamei no direct!"],
+      },
+    ]);
+    ai.assessComment.mockResolvedValue({ sentiment: "POSITIVE", hostile: false, needsHuman: false, reason: "" });
+    ai.generatePersonalizedPublicReply.mockResolvedValue("Oi Bia, o preço está no seu direct 😊");
+    ai.generatePersonalizedDm.mockResolvedValue("Bia, aqui vai a tabela que você pediu");
+
+    await processComment(job());
+
+    expect(mocks.sendCommentReply).toHaveBeenCalledWith(
+      "plain-token",
+      "comment_1",
+      "Oi Bia, o preço está no seu direct 😊"
+    );
+    expect(mocks.sendPrivateReply).toHaveBeenCalledWith(
+      "plain-token",
+      "business_1",
+      "comment_1",
+      "Bia, aqui vai a tabela que você pediu"
+    );
+    expect(mocks.dmLogUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ aiGeneratedReply: "Oi Bia, o preço está no seu direct 😊" }),
+      })
+    );
+  });
+
+  it("falls back to the template when the AI cannot write", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, aiDmEnabled: true, dmMessage: "Modelo {username}" },
+    ]);
+    ai.generatePersonalizedDm.mockResolvedValue(null);
+
+    await processComment(job());
+
+    expect(mocks.sendPrivateReply).toHaveBeenCalledWith(
+      "plain-token",
+      "business_1",
+      "comment_1",
+      "Modelo Bia"
+    );
   });
 });

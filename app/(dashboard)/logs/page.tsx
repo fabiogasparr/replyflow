@@ -42,6 +42,7 @@ const STATUS_FILTERS = [
   "SKIPPED_RATE_LIMIT",
   "SKIPPED_PLAN_LIMIT",
   "SKIPPED_DEDUP",
+  "SKIPPED_HUMAN_REVIEW",
 ];
 
 const STATUS_FILTER_LABELS: Record<string, string> = {
@@ -52,6 +53,7 @@ const STATUS_FILTER_LABELS: Record<string, string> = {
   SKIPPED_RATE_LIMIT: translate("status.rateLimited"),
   SKIPPED_PLAN_LIMIT: translate("status.planLimited"),
   SKIPPED_DEDUP: translate("status.deduplicated"),
+  SKIPPED_HUMAN_REVIEW: translate("status.humanReview"),
 };
 
 export default function LogsPage() {

@@ -27,6 +27,13 @@ import {
   resolveMessageText,
   waitForSendSlot,
 } from "@/lib/messaging/pacing";
+import {
+  assessComment,
+  generatePersonalizedDm,
+  generatePersonalizedPublicReply,
+  humanReviewMessage,
+  shouldHoldForHuman,
+} from "@/lib/ai/comment-intelligence";
 import { getDMQueue, type ProcessCommentJob } from "../client";
 import {
   buildInlineLinkFallback,
@@ -153,6 +160,13 @@ export async function processComment(
     // already sent but whose public reply never posted (e.g. it hit a rate
     // limit) must still come back so the public reply can be retried.
     if (existingLog?.status === "SKIPPED_PLAN_LIMIT") continue;
+    // Held for a person by the AI triage. Only an operator reprocess releases it.
+    if (
+      existingLog?.status === "SKIPPED_HUMAN_REVIEW" &&
+      !job.data.approvedByOperator
+    ) {
+      continue;
+    }
     // A prior run reached the Meta delivery call but did not record SENT. Meta
     // has no private-reply idempotency key, so replaying this ambiguous outcome
     // could duplicate a DM. It remains FAILED for an operator to inspect.
@@ -310,10 +324,71 @@ export async function processComment(
       });
     }
 
+    // AI triage: a hostile or negative comment gets no automatic reply at all
+    // (public or private) and is parked for a person. Operator reprocessing
+    // bypasses this deliberately. When the model is unavailable the comment
+    // is handled normally — a triage outage must not freeze every campaign.
+    const aiContext = {
+      brandUsername: automation.instagramAccount.username,
+      campaignName: automation.name,
+      campaignGoal: automation.goal,
+      instructions: automation.aiInstructions,
+      keywords: automation.keywords,
+    };
+    if (
+      automation.aiModerationEnabled &&
+      !job.data.approvedByOperator &&
+      !existingLog?.publicReplySentAt
+    ) {
+      const assessment = await assessComment(commentText, aiContext);
+      if (shouldHoldForHuman(assessment, automation.aiModerationSensitivity)) {
+        const reason = humanReviewMessage(assessment!);
+        await prisma.dmLog.update({
+          where: {
+            automationId_commentId: { automationId: automation.id, commentId },
+          },
+          data: {
+            status: "SKIPPED_HUMAN_REVIEW",
+            aiSentiment: assessment!.sentiment,
+            aiReviewReason: reason,
+            errorMessage: reason,
+          },
+        });
+        await prisma.operationalEvent
+          .create({
+            data: {
+              workspaceId: automation.workspaceId,
+              source: "SYSTEM",
+              level: "WARNING",
+              message: `Comentário de @${commenterName ?? commenterId} reservado para revisão humana na campanha "${automation.name}"`,
+              payload: {
+                automationId: automation.id,
+                commentId,
+                commentText: commentText.slice(0, 500),
+                sentiment: assessment!.sentiment,
+                reason,
+              },
+            },
+          })
+          .catch(() => {});
+        continue;
+      }
+      if (assessment) {
+        await prisma.dmLog
+          .update({
+            where: {
+              automationId_commentId: { automationId: automation.id, commentId },
+            },
+            data: { aiSentiment: assessment.sentiment },
+          })
+          .catch(() => {});
+      }
+    }
+
     // Public reply leg — decoupled from the DM and posted first so a DM failure
     // (e.g. a non-follower whose messaging is restricted) never suppresses it.
     // Idempotent across retries via publicReplySentAt.
-    const chosenPublicReply = automation.publicReplyEnabled
+    const templatePublicReply = automation.publicReplyEnabled
       ? await resolveMessageText(
           automation.id,
           "publicReply",
@@ -321,6 +396,15 @@ export async function processComment(
           automation.publicReplyMessages
         )
       : null;
+    const chosenPublicReply =
+      automation.publicReplyEnabled && automation.aiPublicReplyEnabled
+        ? ((await generatePersonalizedPublicReply({
+            commentText,
+            commenterName,
+            templateExample: templatePublicReply,
+            context: aiContext,
+          })) ?? templatePublicReply)
+        : templatePublicReply;
     if (chosenPublicReply && !existingLog?.publicReplySentAt) {
       try {
         const publicReply = renderMessageWithTracking({
@@ -334,7 +418,14 @@ export async function processComment(
           where: {
             automationId_commentId: { automationId: automation.id, commentId },
           },
-          data: { publicReplySentAt: new Date(), publicReplyError: null },
+          data: {
+            publicReplySentAt: new Date(),
+            publicReplyError: null,
+            ...(automation.aiPublicReplyEnabled &&
+            chosenPublicReply !== templatePublicReply
+              ? { aiGeneratedReply: publicReply }
+              : {}),
+          },
         });
       } catch (error) {
         console.error(
@@ -506,13 +597,23 @@ export async function processComment(
     }
 
     // Pick this send's wording (variation list + spintax) before touching Meta.
-    const dmText =
+    const templateDmText =
       (await resolveMessageText(
         automation.id,
         "dm",
         automation.dmMessage,
         automation.dmMessages
       )) ?? automation.dmMessage;
+    const dmText =
+      automation.aiDmEnabled && !useOpeningDm && !sendFollowPrompt
+        ? ((await generatePersonalizedDm({
+            commentText,
+            commenterName,
+            template: templateDmText,
+            hasLink: automation.trackedLinks.length > 0,
+            context: aiContext,
+          })) ?? templateDmText)
+        : templateDmText;
     const openingDmText = useOpeningDm
       ? ((await resolveMessageText(
           automation.id,

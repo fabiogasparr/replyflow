@@ -35,6 +35,10 @@ const REQUIRED_APP_ENV = [
   "EMAIL_SERVER",
   "EMAIL_FROM",
   "ALLOWED_EMAILS",
+  "AI_BASE_URL",
+  "AI_API_KEY",
+  "AI_MODEL",
+  "AI_FALLBACK_MODEL",
 ];
 const GENERATED_SECRETS: Record<string, RegExp> = {
   NEXTAUTH_SECRET: /^\$\{SERVICE_BASE64_64_[A-Z]+\}$/,
@@ -43,7 +47,7 @@ const GENERATED_SECRETS: Record<string, RegExp> = {
   // lib/env.ts requires exactly 32 bytes as hex, i.e. a 64-character string.
   ENCRYPTION_KEY: /^\$\{SERVICE_HEX_64_[A-Z]+\}$/,
 };
-const OPERATOR_SECRETS = ["INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "FACEBOOK_APP_SECRET", "RESEND_API_KEY", "EMAIL_SERVER"];
+const OPERATOR_SECRETS = ["INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "FACEBOOK_APP_SECRET", "RESEND_API_KEY", "EMAIL_SERVER", "AI_BASE_URL", "AI_API_KEY", "AI_MODEL", "AI_FALLBACK_MODEL"];
 
 function envOf(block: string): Map<string, string> {
   const env = block.split(/^    environment:\n/m)[1]?.split(/^    [a-z_]+:/m)[0] ?? "";

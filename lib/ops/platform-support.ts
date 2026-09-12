@@ -7,6 +7,7 @@ export const PLATFORM_SUPPORT_STATUSES = [
   "FAILED",
   "SKIPPED_RATE_LIMIT",
   "SKIPPED_PLAN_LIMIT",
+  "SKIPPED_HUMAN_REVIEW",
 ] as const satisfies readonly DmStatus[];
 
 export type PlatformSupportStatus =
@@ -68,6 +69,7 @@ async function supportReadiness() {
 function failureLabel(status: (typeof PLATFORM_SUPPORT_STATUSES)[number]) {
   if (status === "FAILED") return "Falha antes da confirmação";
   if (status === "SKIPPED_RATE_LIMIT") return "Limite temporário da Meta";
+  if (status === "SKIPPED_HUMAN_REVIEW") return "Reservado para revisão humana";
   return "Limite do plano";
 }
 

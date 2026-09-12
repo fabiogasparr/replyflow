@@ -41,6 +41,11 @@ const createAutomationSchema = z
     // private reply still lands well inside Instagram's window.
     humanDelayMinSeconds: z.number().int().min(0).max(900).optional().default(0),
     humanDelayMaxSeconds: z.number().int().min(0).max(900).optional().default(0),
+    aiPublicReplyEnabled: z.boolean().optional().default(false),
+    aiDmEnabled: z.boolean().optional().default(false),
+    aiInstructions: z.string().max(2000).optional().nullable(),
+    aiModerationEnabled: z.boolean().optional().default(false),
+    aiModerationSensitivity: z.enum(["HOSTILE", "NEGATIVE"]).optional().default("HOSTILE"),
     openingDmEnabled: z.boolean().optional().default(false),
     openingDmMessage: z.string().max(1000).optional().nullable(),
     openingDmButtonLabel: z.string().max(64).optional().nullable(),
@@ -107,6 +112,11 @@ const updateAutomationSchema = z.object({
   dmMessages: z.array(z.string().max(1000)).max(10).optional(),
   humanDelayMinSeconds: z.number().int().min(0).max(900).optional(),
   humanDelayMaxSeconds: z.number().int().min(0).max(900).optional(),
+  aiPublicReplyEnabled: z.boolean().optional(),
+  aiDmEnabled: z.boolean().optional(),
+  aiInstructions: z.string().max(2000).optional().nullable(),
+  aiModerationEnabled: z.boolean().optional(),
+  aiModerationSensitivity: z.enum(["HOSTILE", "NEGATIVE"]).optional(),
   openingDmEnabled: z.boolean().optional(),
   openingDmMessage: z.string().max(1000).optional().nullable(),
   openingDmButtonLabel: z.string().max(64).optional().nullable(),
@@ -410,6 +420,11 @@ export async function POST(request: NextRequest) {
       dmMessages: dmVariations,
       humanDelayMinSeconds: humanDelay.min,
       humanDelayMaxSeconds: humanDelay.max,
+      aiPublicReplyEnabled: parsed.data.aiPublicReplyEnabled,
+      aiDmEnabled: parsed.data.aiDmEnabled,
+      aiInstructions: parsed.data.aiInstructions?.trim() || null,
+      aiModerationEnabled: parsed.data.aiModerationEnabled,
+      aiModerationSensitivity: parsed.data.aiModerationSensitivity,
       openingDmEnabled,
       openingDmMessage: openingDmEnabled
         ? parsed.data.openingDmMessage || null
@@ -537,6 +552,9 @@ export async function PATCH(request: NextRequest) {
   if (automationData.matchAnyPost === true || automationData.pendingNextReel === true) {
     automationData.postId = null;
     automationData.postUrl = null;
+  }
+  if (automationData.aiInstructions !== undefined) {
+    automationData.aiInstructions = automationData.aiInstructions?.trim() || null;
   }
   if (automationData.dmMessages !== undefined) {
     const primary = (automationData.dmMessage ?? existing.dmMessage).trim();

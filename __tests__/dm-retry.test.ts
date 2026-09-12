@@ -117,8 +117,15 @@ describe("DM retry eligibility", () => {
         matchedKeyword: "quero",
         mediaId: "media_1",
         source: "MANUAL",
+        approvedByOperator: true,
       },
     });
+  });
+
+  it("lets an operator release a comment held for human review", () => {
+    expect(
+      getDmRetryEligibility({ ...candidate, status: "SKIPPED_HUMAN_REVIEW" })
+    ).toEqual({ allowed: true, reason: null });
   });
 
   it("blocks old any-post rows without their source media", () => {

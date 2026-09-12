@@ -17,6 +17,7 @@ const ptBR = {
   "status.rateLimited": "Limite da Meta",
   "status.planLimited": "Limite do plano",
   "status.noMatch": "Sem correspondência",
+  "status.humanReview": "Revisão humana",
   "dashboard.greeting": "Olá, {{name}}!",
   "dashboard.genericName": "tudo bem",
   "dashboard.activity": "Ver atividade",

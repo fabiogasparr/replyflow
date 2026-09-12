@@ -63,7 +63,8 @@ type OperationsSnapshot = {
         | "SKIPPED_DEDUP"
         | "SKIPPED_RATE_LIMIT"
         | "SKIPPED_PLAN_LIMIT"
-        | "SKIPPED_NO_MATCH",
+        | "SKIPPED_NO_MATCH"
+        | "SKIPPED_HUMAN_REVIEW",
         number
       >;
       comparison: FailureComparison;

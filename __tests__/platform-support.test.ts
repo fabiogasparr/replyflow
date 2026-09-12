@@ -85,7 +85,7 @@ describe("fila global de suporte", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: {
-            in: ["FAILED", "SKIPPED_RATE_LIMIT", "SKIPPED_PLAN_LIMIT"],
+            in: ["FAILED", "SKIPPED_RATE_LIMIT", "SKIPPED_PLAN_LIMIT", "SKIPPED_HUMAN_REVIEW"],
           },
           workspace: { archivedAt: null },
           OR: expect.any(Array),

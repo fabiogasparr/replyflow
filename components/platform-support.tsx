@@ -8,7 +8,8 @@ type SupportStatus =
   | "ALL"
   | "FAILED"
   | "SKIPPED_RATE_LIMIT"
-  | "SKIPPED_PLAN_LIMIT";
+  | "SKIPPED_PLAN_LIMIT"
+  | "SKIPPED_HUMAN_REVIEW";
 
 type SupportIncident = {
   id: string;
@@ -50,6 +51,7 @@ const STATUS_OPTIONS: Array<{ value: SupportStatus; label: string }> = [
   { value: "FAILED", label: "Falhas" },
   { value: "SKIPPED_RATE_LIMIT", label: "Limite da Meta" },
   { value: "SKIPPED_PLAN_LIMIT", label: "Limite do plano" },
+  { value: "SKIPPED_HUMAN_REVIEW", label: "Revisão humana" },
 ];
 
 const TRIGGER_LABELS = {

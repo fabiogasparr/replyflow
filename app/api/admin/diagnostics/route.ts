@@ -60,6 +60,7 @@ export async function GET() {
             "SKIPPED_RATE_LIMIT",
             "SKIPPED_PLAN_LIMIT",
             "SKIPPED_NO_MATCH",
+            "SKIPPED_HUMAN_REVIEW",
           ],
         },
       },

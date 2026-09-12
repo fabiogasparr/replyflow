@@ -39,6 +39,8 @@ const RETRYABLE_STATUSES = new Set<DmStatus>([
   "FAILED",
   "SKIPPED_RATE_LIMIT",
   "SKIPPED_PLAN_LIMIT",
+  // Held by the AI triage; an operator reprocess is the explicit approval.
+  "SKIPPED_HUMAN_REVIEW",
 ]);
 
 export function getDmRetryEligibility(
@@ -132,6 +134,7 @@ export function buildDmRetryJob(log: DmRetryCandidate):
           ? { originalMediaId: log.originalMediaId }
           : {}),
         source: "MANUAL",
+        approvedByOperator: true,
       },
     };
   }
@@ -145,6 +148,7 @@ export function buildDmRetryJob(log: DmRetryCandidate):
         messageText: log.commentText,
         senderId: log.commenterId,
         matchedKeyword: log.matchedKeyword,
+        approvedByOperator: true,
       },
     };
   }

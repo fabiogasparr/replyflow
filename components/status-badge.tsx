@@ -11,6 +11,7 @@ const statusConfig: Record<string, { text: string; label: MessageKey }> = {
   SKIPPED_RATE_LIMIT: { text: "text-warning", label: "status.rateLimited" },
   SKIPPED_PLAN_LIMIT: { text: "text-warning", label: "status.planLimited" },
   SKIPPED_NO_MATCH: { text: "text-muted", label: "status.noMatch" },
+  SKIPPED_HUMAN_REVIEW: { text: "text-warning", label: "status.humanReview" },
 };
 
 interface StatusBadgeProps {

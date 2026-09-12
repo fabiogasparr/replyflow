@@ -49,6 +49,11 @@ interface LoadedCampaign {
   dmMessages?: string[];
   humanDelayMinSeconds?: number | null;
   humanDelayMaxSeconds?: number | null;
+  aiPublicReplyEnabled?: boolean;
+  aiDmEnabled?: boolean;
+  aiInstructions?: string | null;
+  aiModerationEnabled?: boolean;
+  aiModerationSensitivity?: string | null;
   openingDmEnabled: boolean;
   openingDmMessage: string | null;
   openingDmButtonLabel: string | null;
@@ -186,6 +191,23 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
   const [humanDelayEnabled, setHumanDelayEnabled] = useState(mode === "new");
   const [humanDelayMin, setHumanDelayMin] = useState(20);
   const [humanDelayMax, setHumanDelayMax] = useState(90);
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiPublicReplyEnabled, setAiPublicReplyEnabled] = useState(false);
+  const [aiDmEnabled, setAiDmEnabled] = useState(false);
+  const [aiInstructions, setAiInstructions] = useState("");
+  const [aiModerationEnabled, setAiModerationEnabled] = useState(false);
+  const [aiModerationSensitivity, setAiModerationSensitivity] = useState<
+    "HOSTILE" | "NEGATIVE"
+  >("HOSTILE");
+  const [aiBusy, setAiBusy] = useState<string | null>(null);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [aiSampleComment, setAiSampleComment] = useState("");
+  const [aiPreview, setAiPreview] = useState<{
+    heldForHuman: boolean;
+    assessment: { sentiment: string; hostile: boolean; needsHuman: boolean; reason: string } | null;
+    publicReply: string | null;
+    dm: string | null;
+  } | null>(null);
   const [linkOpen, setLinkOpen] = useState(false);
   const [trackedDestinationUrl, setTrackedDestinationUrl] = useState("");
   const [linkButtonLabel, setLinkButtonLabel] = useState("Abrir link");
@@ -301,6 +323,13 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         setOpeningDmButtonLabel(c.openingDmButtonLabel ?? "");
         setDmMessage(c.dmMessage);
         setDmVariations(c.dmMessages ?? []);
+        setAiPublicReplyEnabled(c.aiPublicReplyEnabled ?? false);
+        setAiDmEnabled(c.aiDmEnabled ?? false);
+        setAiInstructions(c.aiInstructions ?? "");
+        setAiModerationEnabled(c.aiModerationEnabled ?? false);
+        setAiModerationSensitivity(
+          c.aiModerationSensitivity === "NEGATIVE" ? "NEGATIVE" : "HOSTILE"
+        );
         const delayMax = c.humanDelayMaxSeconds ?? 0;
         setHumanDelayEnabled(delayMax > 0);
         if (delayMax > 0) {
@@ -571,6 +600,122 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
     setPostCaption(caption ?? "");
   }
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai/status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((payload) => {
+        if (!cancelled) setAiAvailable(Boolean(payload?.data?.configured));
+      })
+      .catch(() => {
+        if (!cancelled) setAiAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function aiContextPayload() {
+    return {
+      instagramAccountId: selectedAccountId || null,
+      campaignName: name.trim() || null,
+      instructions: aiInstructions.trim() || null,
+      keywords: matchMode === "any" ? [] : keywords,
+    };
+  }
+
+  async function generateAiVariations(kind: "publicReply" | "dm") {
+    const base =
+      kind === "publicReply"
+        ? publicReplyMessages.find((m) => m.trim())?.trim()
+        : dmMessage.trim();
+    if (!base) {
+      setAiNotice(
+        kind === "publicReply"
+          ? "Escreva primeiro uma resposta pública para a IA variar."
+          : "Escreva primeiro a DM para a IA variar."
+      );
+      return;
+    }
+    const existing = kind === "publicReply" ? publicReplyMessages : dmVariations;
+    const room = (kind === "publicReply" ? 10 : 9) - existing.filter((m) => m.trim()).length;
+    if (room <= 0) {
+      setAiNotice("A lista já está cheia. Remova alguma variação antes de gerar mais.");
+      return;
+    }
+    setAiBusy(kind);
+    setAiNotice(null);
+    try {
+      const res = await fetch("/api/ai/variations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind,
+          base,
+          count: Math.min(4, room),
+          ...aiContextPayload(),
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error ?? "Não foi possível gerar variações");
+      }
+      const generated = (payload.data.variations as string[]).filter(
+        (v) => !existing.some((m) => m.trim() === v.trim())
+      );
+      if (generated.length === 0) {
+        setAiNotice("A IA não trouxe variações novas. Tente de novo.");
+        return;
+      }
+      if (kind === "publicReply") {
+        setPublicReplyMessages((prev) => [...prev.filter((m) => m.trim()), ...generated].slice(0, 10));
+      } else {
+        setDmVariations((prev) => [...prev.filter((m) => m.trim()), ...generated].slice(0, 9));
+      }
+      setAiNotice(`${generated.length} variação(ões) adicionada(s). Revise antes de salvar.`);
+    } catch (cause) {
+      setAiNotice(cause instanceof Error ? cause.message : "Não foi possível gerar variações");
+    } finally {
+      setAiBusy(null);
+    }
+  }
+
+  async function runAiPreview() {
+    if (!aiSampleComment.trim()) {
+      setAiNotice("Digite um comentário de exemplo para testar.");
+      return;
+    }
+    setAiBusy("preview");
+    setAiNotice(null);
+    setAiPreview(null);
+    try {
+      const res = await fetch("/api/ai/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          commentText: aiSampleComment.trim(),
+          commenterName: "maria.exemplo",
+          publicReplyTemplate: aiPublicReplyEnabled
+            ? publicReplyMessages.find((m) => m.trim()) ?? ""
+            : undefined,
+          dmTemplate: aiDmEnabled ? dmMessage : null,
+          hasLink: Boolean(trackedDestinationUrl.trim()),
+          moderationSensitivity: aiModerationSensitivity,
+          ...aiContextPayload(),
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error ?? "Não foi possível testar a IA");
+      }
+      setAiPreview(payload.data);
+    } catch (cause) {
+      setAiNotice(cause instanceof Error ? cause.message : "Não foi possível testar a IA");
+    } finally {
+      setAiBusy(null);
+    }
+  }
+
   function ensureLinkToken() {
     setDmMessage((cur) => (cur.includes("{link}") ? cur : `${cur.trim()} {link}`.trim()));
   }
@@ -603,6 +748,11 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       dmMessages: dmVariations.map((m) => m.trim()).filter(Boolean),
       humanDelayMinSeconds: humanDelayEnabled ? Math.min(humanDelayMin, humanDelayMax) : 0,
       humanDelayMaxSeconds: humanDelayEnabled ? Math.max(humanDelayMin, humanDelayMax) : 0,
+      aiPublicReplyEnabled: aiPublicReplyEnabled && publicReplyEnabled,
+      aiDmEnabled,
+      aiInstructions: aiInstructions.trim() || null,
+      aiModerationEnabled,
+      aiModerationSensitivity,
       openingDmEnabled,
       openingDmMessage: openingDmEnabled ? openingDmMessage : null,
       openingDmButtonLabel: openingDmEnabled ? openingDmButtonLabel : null,
@@ -1023,16 +1173,31 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                   )}
                 </div>
               ))}
-              {publicReplyMessages.length < 10 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPublicReplyMessages((prev) => [...prev, ""])
-                  }
-                  className="text-xs font-medium text-accent hover:underline"
-                >
-                  + Adicionar outra resposta
-                </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {publicReplyMessages.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPublicReplyMessages((prev) => [...prev, ""])
+                    }
+                    className="text-xs font-medium text-accent hover:underline"
+                  >
+                    + Adicionar outra resposta
+                  </button>
+                )}
+                {aiAvailable && (
+                  <button
+                    type="button"
+                    disabled={aiBusy !== null}
+                    onClick={() => generateAiVariations("publicReply")}
+                    className="text-xs font-medium text-accent hover:underline disabled:opacity-50"
+                  >
+                    {aiBusy === "publicReply" ? "Gerando…" : "✨ Gerar variações com IA"}
+                  </button>
+                )}
+              </div>
+              {aiNotice && aiBusy === null && (
+                <p className="text-xs text-muted">{aiNotice}</p>
               )}
               <p className="text-xs text-muted">
                 Uma resposta é escolhida aleatoriamente (nunca a mesma duas
@@ -1253,14 +1418,29 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                   </button>
                 </div>
               ))}
-              {dmVariations.length < 9 && (
-                <button
-                  type="button"
-                  onClick={() => setDmVariations((prev) => [...prev, ""])}
-                  className="text-xs font-medium text-accent hover:underline"
-                >
-                  + Adicionar uma variação da DM
-                </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {dmVariations.length < 9 && (
+                  <button
+                    type="button"
+                    onClick={() => setDmVariations((prev) => [...prev, ""])}
+                    className="text-xs font-medium text-accent hover:underline"
+                  >
+                    + Adicionar uma variação da DM
+                  </button>
+                )}
+                {aiAvailable && (
+                  <button
+                    type="button"
+                    disabled={aiBusy !== null}
+                    onClick={() => generateAiVariations("dm")}
+                    className="text-xs font-medium text-accent hover:underline disabled:opacity-50"
+                  >
+                    {aiBusy === "dm" ? "Gerando…" : "✨ Gerar variações com IA"}
+                  </button>
+                )}
+              </div>
+              {aiNotice && aiBusy === null && (
+                <p className="text-xs text-muted">{aiNotice}</p>
               )}
               {dmVariations.length > 0 && (
                 <p className="text-xs text-muted">
@@ -1317,6 +1497,152 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 </p>
               </div>
             )}
+          </div>
+        </Section>
+
+        <Section id="flow-step-ai" title="Inteligência artificial">
+          {aiAvailable === false && (
+            <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted">
+              A IA ainda não está configurada nesta instalação (variáveis
+              AI_BASE_URL, AI_API_KEY e AI_MODEL). As opções abaixo ficam salvas
+              e passam a valer assim que ela for ativada.
+            </p>
+          )}
+          <div className="rounded-lg border border-border p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-foreground">
+                escrever a resposta pública personalizada para cada comentário
+              </span>
+              <Toggle
+                on={aiPublicReplyEnabled}
+                onToggle={() => setAiPublicReplyEnabled(!aiPublicReplyEnabled)}
+              />
+            </div>
+            {aiPublicReplyEnabled && !publicReplyEnabled && (
+              <p className="text-xs text-warning">
+                Ative &quot;responder publicamente aos comentários&quot; acima para
+                a IA ter onde escrever.
+              </p>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-foreground">
+                adaptar a DM ao que a pessoa escreveu
+              </span>
+              <Toggle on={aiDmEnabled} onToggle={() => setAiDmEnabled(!aiDmEnabled)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-foreground">
+                reservar comentários negativos ou ofensivos para uma pessoa responder
+              </span>
+              <Toggle
+                on={aiModerationEnabled}
+                onToggle={() => setAiModerationEnabled(!aiModerationEnabled)}
+              />
+            </div>
+            {aiModerationEnabled && (
+              <div className="space-y-2">
+                <Radio
+                  checked={aiModerationSensitivity === "HOSTILE"}
+                  onSelect={() => setAiModerationSensitivity("HOSTILE")}
+                >
+                  só comentários ofensivos, depreciativos ou que pedem atenção humana
+                  (reclamação, reembolso, urgência)
+                </Radio>
+                <Radio
+                  checked={aiModerationSensitivity === "NEGATIVE"}
+                  onSelect={() => setAiModerationSensitivity("NEGATIVE")}
+                >
+                  qualquer comentário negativo, mesmo educado
+                </Radio>
+                <p className="text-xs text-muted">
+                  Esses comentários não recebem resposta automática (nem pública, nem
+                  DM) e aparecem em Histórico de envios como &quot;Revisão humana&quot;.
+                  Quem tiver permissão pode liberar o envio em &quot;Reprocessar&quot;.
+                </p>
+              </div>
+            )}
+            {(aiPublicReplyEnabled || aiDmEnabled || aiModerationEnabled) && (
+              <div className="space-y-2 border-t border-border pt-3">
+                <label className="text-xs text-muted">
+                  Instruções para a IA (quem é a marca, tom de voz, o que pode e o
+                  que não pode prometer)
+                </label>
+                <textarea
+                  value={aiInstructions}
+                  onChange={(e) => setAiInstructions(e.target.value)}
+                  placeholder="Ex.: Somos a KZ3, consultoria de automação com IA para pequenas empresas. Tom próximo e direto, sem gírias. Nunca prometa preço ou prazo; convide a pessoa a ver o material no direct."
+                  rows={4}
+                  maxLength={2000}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none resize-none"
+                />
+                <p className="text-xs text-muted">
+                  A IA nunca inventa preços ou promoções, não usa hashtags, não
+                  discute com quem comenta e mantém os marcadores {"{username}"} e
+                  {" {link}"}. Se ela falhar, a campanha usa as mensagens escritas acima.
+                </p>
+                {aiAvailable && (
+                  <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
+                    <label className="text-xs text-muted">
+                      Testar com um comentário de exemplo (nada é enviado)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        value={aiSampleComment}
+                        onChange={(e) => setAiSampleComment(e.target.value)}
+                        placeholder={`Ex.: ${keywords[0] ?? "quero"}! Funciona pra loja física?`}
+                        maxLength={1000}
+                        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        disabled={aiBusy !== null}
+                        onClick={runAiPreview}
+                        className="shrink-0 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:border-border-hover disabled:opacity-50"
+                      >
+                        {aiBusy === "preview" ? "Testando…" : "Testar"}
+                      </button>
+                    </div>
+                    {aiPreview && (
+                      <div className="space-y-1 text-xs text-foreground">
+                        {aiPreview.assessment && (
+                          <p>
+                            <span className="text-muted">Triagem:</span>{" "}
+                            {aiPreview.assessment.sentiment === "POSITIVE"
+                              ? "positivo"
+                              : aiPreview.assessment.sentiment === "NEGATIVE"
+                                ? "negativo"
+                                : "neutro"}
+                            {aiPreview.assessment.hostile ? ", ofensivo" : ""}
+                            {aiPreview.assessment.needsHuman ? ", precisa de atenção humana" : ""}
+                            {aiPreview.assessment.reason ? ` — ${aiPreview.assessment.reason}` : ""}
+                          </p>
+                        )}
+                        {aiPreview.heldForHuman ? (
+                          <p className="text-warning">
+                            Este comentário ficaria reservado para revisão humana.
+                          </p>
+                        ) : (
+                          <>
+                            {aiPreview.publicReply && (
+                              <p>
+                                <span className="text-muted">Resposta pública:</span>{" "}
+                                {aiPreview.publicReply}
+                              </p>
+                            )}
+                            {aiPreview.dm && (
+                              <p>
+                                <span className="text-muted">DM:</span> {aiPreview.dm}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {aiNotice && <p className="text-xs text-muted">{aiNotice}</p>}
           </div>
         </Section>
       </div>

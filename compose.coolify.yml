@@ -13,6 +13,9 @@ name: replyflow
 #   INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, FACEBOOK_APP_SECRET e
 #   RESEND_API_KEY ou EMAIL_SERVER (nunca os dois). ALLOWED_EMAILS vazio libera
 #   cadastro público; preencher para restringir a homologação.
+# - IA (opcional): AI_BASE_URL (endpoint compatível com OpenAI, ex.: o OmniRoute
+#   em https://omniroute.kz3solucoes.cloud/v1), AI_API_KEY, AI_MODEL e
+#   AI_FALLBACK_MODEL (modelo de reserva). Vazios desligam todos os recursos de IA.
 # - As migrations do Prisma executam no início do serviço `web`, antes do
 #   `next start`; worker e cron só sobem depois do web. Ver docs/DEPLOY_COOLIFY.md.
 # - Os três serviços da aplicação compartilham a mesma imagem; o Docker
@@ -74,6 +77,10 @@ services:
       EMAIL_SERVER: ${EMAIL_SERVER}
       EMAIL_FROM: ${EMAIL_FROM:-ReplyFlow <login@kz3solucoes.cloud>}
       ALLOWED_EMAILS: ${ALLOWED_EMAILS}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL}
       SERVICE_FQDN_WEB_3000: ""
     depends_on:
       postgres:
@@ -115,6 +122,10 @@ services:
       EMAIL_SERVER: ${EMAIL_SERVER}
       EMAIL_FROM: ${EMAIL_FROM:-ReplyFlow <login@kz3solucoes.cloud>}
       ALLOWED_EMAILS: ${ALLOWED_EMAILS}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,6 +160,10 @@ services:
       EMAIL_SERVER: ${EMAIL_SERVER}
       EMAIL_FROM: ${EMAIL_FROM:-ReplyFlow <login@kz3solucoes.cloud>}
       ALLOWED_EMAILS: ${ALLOWED_EMAILS}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL}
       CRON_BASE_URL: http://web:3000
     depends_on:
       web:

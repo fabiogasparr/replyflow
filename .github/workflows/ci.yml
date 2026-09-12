@@ -86,6 +86,11 @@ jobs:
         env:
           TEST_REDIS_URL: redis://localhost:6379
 
+      - name: Verify atomic email sign-in rate limits
+        run: npm run test:auth-rate-limit-redis
+        env:
+          TEST_REDIS_URL: redis://localhost:6379
+
       - name: Verify automation operational-state migration
         run: npm run test:automation-state-db
         env:

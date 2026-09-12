@@ -59,6 +59,14 @@ export type AuthErrorContent = {
 };
 
 const AUTH_ERROR_CONTENT: Record<string, AuthErrorContent> = {
+  TooManyRequests: {
+    title: "Aguarde antes de pedir outro link",
+    description: "Confira sua caixa de entrada e use o link mais recente. Novos pedidos estão temporariamente limitados; tente novamente mais tarde. Sua sessão e os links já recebidos continuam válidos dentro do prazo original.",
+  },
+  ServiceUnavailable: {
+    title: "Envio temporariamente indisponível",
+    description: "Não foi possível verificar o limite de envio agora. Aguarde um instante e tente novamente. Se já recebeu um link, você ainda pode usá-lo dentro do prazo de validade.",
+  },
   Configuration: {
     title: "Acesso temporariamente indisponível",
     description:

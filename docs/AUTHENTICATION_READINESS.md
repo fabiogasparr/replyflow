@@ -10,6 +10,10 @@ A mesma barreira roda novamente dentro da Server Action e imediatamente antes de
 
 Essa validação não testa credenciais reais e não realiza uma chamada de rede. Uma chave com formato válido ainda pode ser revogada ou pertencer a uma conta sem o domínio do remetente verificado.
 
+O código também limita a emissão de novos links usando Redis,
+sem bloquear sessões ou a utilização de links existentes. Regras, estado de
+validação e cuidados de implantação estão em [proteção de reenvios](AUTH_RATE_LIMITS.md).
+
 ## Erros seguros
 
 O Auth.js redireciona erros para `/login/error`. A tela traduz os códigos conhecidos:
@@ -17,6 +21,8 @@ O Auth.js redireciona erros para `/login/error`. A tela traduz os códigos conhe
 - `Configuration`: provedor ausente, inválido ou rejeitado;
 - `AccessDenied`: endereço fora da lista permitida;
 - `Verification`: link inválido, expirado ou já utilizado;
+- `TooManyRequests`: emissão de novos links temporariamente limitada;
+- `ServiceUnavailable`: indisponibilidade da verificação de limite de envio;
 - qualquer outro valor: orientação genérica para solicitar um novo acesso.
 
 O código recebido na URL nunca é interpolado na página. Tokens, e-mail do destinatário, resposta do provedor e variáveis de ambiente não são exibidos.

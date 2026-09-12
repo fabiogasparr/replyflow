@@ -21,6 +21,7 @@
     "test:conversations-db": "tsx scripts/test-conversations-db.ts",
     "test:dm-retry-db": "tsx scripts/test-dm-retry-db.ts",
     "test:dm-retry-queue": "tsx scripts/test-dm-retry-queue.ts",
+    "test:auth-rate-limit-redis": "tsx scripts/test-auth-rate-limit-redis.ts",
     "test:automation-state-db": "tsx scripts/test-automation-state-db.ts",
     "test:billing-db": "tsx scripts/test-billing-db.ts",
     "test:billing-usage-db": "tsx scripts/test-billing-usage-db.ts",

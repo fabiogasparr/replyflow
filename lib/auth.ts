@@ -7,6 +7,7 @@ import { ensureWorkspaceForUser, getActiveWorkspace } from "@/lib/workspace";
 import { isEmailAllowedToSignIn } from "@/lib/env";
 import { sendResendVerification, sendSmtpVerification } from "@/lib/auth-email";
 import { normalizeAuthEmail } from "@/lib/auth-email-address";
+import { reserveAuthEmail } from "@/lib/auth-rate-limit";
 
 type AdapterPrismaClient = Parameters<typeof PrismaAdapter>[0];
 
@@ -37,8 +38,18 @@ export const authConfig = {
   callbacks: {
     // Runs before the magic link is sent, so a blocked address never receives
     // one, and again when the link is verified.
-    async signIn({ user }) {
-      return isEmailAllowedToSignIn(user?.email);
+    async signIn({ user, email }) {
+      if (!isEmailAllowedToSignIn(user?.email)) return false;
+      // Verification callbacks and existing sessions must remain usable when
+      // throttled or Redis is down. Reserve only before new token creation.
+      if (email?.verificationRequest) {
+        const reservation = await reserveAuthEmail(user.email ?? "");
+        if (!reservation.allowed) {
+          const code = reservation.reason === "limited" ? "TooManyRequests" : "ServiceUnavailable";
+          return `/login/error?error=${code}`;
+        }
+      }
+      return true;
     },
     async session({ session, user }) {
       if (session.user) {

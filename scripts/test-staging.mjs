@@ -58,6 +58,22 @@ async function login(email) {
   return request;
 }
 
+// Malformed recipient syntax must never reach SMTP, even when its first
+// address is allowlisted. This exercises Auth.js normalization, not just helpers.
+for (const email of ['tester@replyflow.test,blocked@replyflow.test', 'Tester <tester@replyflow.test>', 'tester@replyflow.test(comment)']) {
+  const request = client();
+  const csrf = await (await request('/api/auth/csrf')).json();
+  const before = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  const response = await request('/api/auth/signin/nodemailer', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ csrfToken: csrf.csrfToken, email, callbackUrl: `${base.origin}/dashboard` }),
+  });
+  const target = new URL(response.headers.get('location'), base);
+  assert.ok(target.searchParams.has('error'), 'Sintaxe ambígua deve ser rejeitada no fluxo real de login.');
+  const after = await (await fetch(`${mailpit}/api/v1/messages`)).json();
+  assert.equal(after.total, before.total, 'Tentativa inválida não pode gerar e-mail. Execute sem logins concorrentes.');
+}
+
 const first = await login('tester@replyflow.test');
 const second = await login('tenant2@replyflow.test');
 const firstOnboardingResponse = await first('/api/instagram/onboarding');
@@ -88,5 +104,5 @@ if (!env.INSTAGRAM_APP_ID) {
   const wizardConnect = await first(`/api/instagram/connect?flow=wizard&workspaceId=${encodeURIComponent(firstOnboarding.workspace.id)}`);
   assert.equal(new URL(wizardConnect.headers.get('location')).pathname, '/settings/instagram', 'Falha de configuração retorna ao wizard.');
 }
-console.log('✓ HTTPS/HTTP, saúde, login por e-mail, dois tenants, assinatura Free, wizard e isolamento real aprovados.');
+console.log('✓ HTTPS/HTTP, saúde, rejeição de destinatários ambíguos, login por e-mail, dois tenants, assinatura Free, wizard e isolamento real aprovados.');
 console.log('Nenhuma mensagem foi enviada ao Instagram. E-mails capturados somente no Mailpit.');

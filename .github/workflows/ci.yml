@@ -49,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit dependencies before release
+        run: npm run security:audit
+
       - name: Generate Prisma client
         run: npm run db:generate
         env:

@@ -43,7 +43,9 @@ Não é uma solução completa de DDoS, CAPTCHA ou limitação por IP. A consult
 
 Em 12/09/2026, os 599 testes locais, lint, typecheck e build passaram; a auditoria de dependências não apontou vulnerabilidades. O teste com Redis 7 descartável também passou: 50 requisições simultâneas para o mesmo endereço reservaram apenas um envio; 20 destinatários concorrentes respeitaram o teto global de três; expiração, quotas por endereço, namespaces independentes e a conexão real usada no login foram verificados. O script foi corrigido para executar com `tsx` no formato de módulos do projeto, sem `await` no nível superior.
 
-**Pendente:** teste HTTPS atualizado, publicação na prévia e CI desta branch. O bloqueio anterior do serviço de aprovação não se repetiu nesta execução; não presumir que o controle esteja ativo antes de concluir a implantação.
+A imagem Docker foi construída e a proteção foi implantada na homologação em 12/09/2026, mantendo o túnel e os volumes. O teste HTTPS integrado passou com dois clientes: reenvio imediato recusado sem novo e-mail no Mailpit, primeiro link ainda utilizável, cookies seguros, leitura do wizard autenticado e bloqueio de leitura/alteração cruzada no CRM. Nenhuma mensagem foi enviada ao Instagram. A imagem anterior foi preservada com a tag local `replyflow-staging:before-auth-limits-20260912`.
+
+**Pendente:** resultado do CI desta branch. A autorização e a entrega real de mensagens pela Meta não fazem parte da validação acima e continuam pendentes.
 
 ## Implantação e rollback
 

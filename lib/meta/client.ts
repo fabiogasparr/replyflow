@@ -759,7 +759,7 @@ export async function subscribeInstagramAccountToWebhooks(
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        subscribed_fields: ["comments", "messages"],
+        subscribed_fields: ["comments", "live_comments", "messages"],
       }),
     }
   );
@@ -772,5 +772,58 @@ export async function debugToken(inputToken: string, accessToken: string) {
   url.searchParams.set("input_token", inputToken);
   url.searchParams.set("access_token", accessToken);
   const response = await fetch(url.toString());
+  return handleResponse(response);
+}
+
+// ─── Messenger profile (ice breakers) ──────────────────────────────────────────
+
+export interface IceBreakerQuestion {
+  question: string;
+  payload: string;
+}
+
+/**
+ * Publish the account's ice breakers — the suggested questions Instagram shows
+ * when someone opens a new conversation with the account. Meta allows at most
+ * four; the payload of each comes back as a postback when tapped.
+ */
+export async function setInstagramIceBreakers(
+  accessToken: string,
+  questions: IceBreakerQuestion[]
+): Promise<{ result?: string }> {
+  const response = await fetch(`${instagramGraphBase()}/me/messenger_profile`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      platform: "instagram",
+      ice_breakers: [
+        {
+          call_to_actions: questions.slice(0, 4).map((q) => ({
+            question: q.question.slice(0, 80),
+            payload: q.payload,
+          })),
+          locale: "default",
+        },
+      ],
+    }),
+  });
+  return handleResponse(response);
+}
+
+/** Remove every ice breaker from the account's messenger profile. */
+export async function clearInstagramIceBreakers(
+  accessToken: string
+): Promise<{ result?: string }> {
+  const response = await fetch(`${instagramGraphBase()}/me/messenger_profile`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ platform: "instagram", fields: ["ice_breakers"] }),
+  });
   return handleResponse(response);
 }

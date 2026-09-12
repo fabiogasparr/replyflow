@@ -45,6 +45,10 @@ interface LoadedCampaign {
   keywords: string[];
   matchAnyWord: boolean;
   dmTriggerEnabled: boolean;
+  storyTriggerEnabled?: boolean;
+  referralTriggerEnabled?: boolean;
+  referralCode?: string | null;
+  iceBreakerQuestion?: string | null;
   dmMessage: string;
   dmMessages?: string[];
   humanDelayMinSeconds?: number | null;
@@ -176,6 +180,10 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
   const [matchMode, setMatchMode] = useState<MatchMode>("specific");
   const [keywordText, setKeywordText] = useState("");
   const [dmTriggerEnabled, setDmTriggerEnabled] = useState(false);
+  const [storyTriggerEnabled, setStoryTriggerEnabled] = useState(false);
+  const [referralTriggerEnabled, setReferralTriggerEnabled] = useState(false);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [iceBreakerQuestion, setIceBreakerQuestion] = useState("");
 
   const [publicReplyEnabled, setPublicReplyEnabled] = useState(false);
   const [publicReplyMessages, setPublicReplyMessages] = useState<string[]>([""]);
@@ -310,6 +318,10 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         setMatchMode(c.matchAnyWord ? "any" : "specific");
         setKeywordText(c.keywords.join(", "));
         setDmTriggerEnabled(c.dmTriggerEnabled ?? false);
+        setStoryTriggerEnabled(c.storyTriggerEnabled ?? false);
+        setReferralTriggerEnabled(c.referralTriggerEnabled ?? false);
+        setReferralCode(c.referralCode ?? null);
+        setIceBreakerQuestion(c.iceBreakerQuestion ?? "");
         setPublicReplyEnabled(c.publicReplyEnabled);
         setPublicReplyMessages(
           c.publicReplyMessages?.length
@@ -744,6 +756,9 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       matchAnyWord: matchMode === "any",
       keywords: matchMode === "any" ? [] : keywords,
       dmTriggerEnabled,
+      storyTriggerEnabled,
+      referralTriggerEnabled,
+      iceBreakerQuestion: iceBreakerQuestion.trim() || null,
       dmMessage,
       dmMessages: dmVariations.map((m) => m.trim()).filter(Boolean),
       humanDelayMinSeconds: humanDelayEnabled ? Math.min(humanDelayMin, humanDelayMax) : 0,
@@ -1132,6 +1147,64 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 : "Uma DM com qualquer uma dessas palavras receberá a mesma resposta, sem precisar de comentário."}
             </p>
           )}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+            <span className="text-sm text-foreground">
+              responder também a respostas e menções nos Stories
+            </span>
+            <Toggle
+              on={storyTriggerEnabled}
+              onToggle={() => setStoryTriggerEnabled(!storyTriggerEnabled)}
+            />
+          </div>
+          {storyTriggerEnabled && (
+            <p className="text-xs text-muted">
+              Quem responder a um story seu{" "}
+              {matchMode === "any" ? "com qualquer texto" : "com essas palavras"} ou
+              mencionar o perfil em um story recebe a DM desta campanha.
+            </p>
+          )}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+            <span className="text-sm text-foreground">
+              disparar por um link direto para a DM (ig.me)
+            </span>
+            <Toggle
+              on={referralTriggerEnabled}
+              onToggle={() => setReferralTriggerEnabled(!referralTriggerEnabled)}
+            />
+          </div>
+          {referralTriggerEnabled && (
+            <div className="space-y-1 text-xs text-muted">
+              {referralCode ? (
+                <p>
+                  Link da campanha:{" "}
+                  <code className="rounded bg-surface px-1 py-0.5 text-foreground">
+                    https://ig.me/m/{username}?ref={referralCode}
+                  </code>
+                  {" "}— use na bio, em anúncios ou em botões. Quem abrir a conversa
+                  por ele recebe a DM desta campanha, sem precisar digitar nada.
+                </p>
+              ) : (
+                <p>O link será gerado ao salvar a campanha.</p>
+              )}
+            </div>
+          )}
+          <div className="space-y-2 rounded-lg border border-border px-3 py-2.5">
+            <label className="text-sm text-foreground">
+              pergunta inicial na DM (ice breaker)
+            </label>
+            <input
+              value={iceBreakerQuestion}
+              onChange={(e) => setIceBreakerQuestion(e.target.value)}
+              placeholder="Ex.: Quero receber o guia gratuito"
+              maxLength={80}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+            />
+            <p className="text-xs text-muted">
+              Aparece como sugestão quando alguém abre uma conversa nova com o perfil;
+              ao tocar, a pessoa recebe a DM desta campanha. O Instagram mostra até 4
+              perguntas por conta. Deixe em branco para não usar.
+            </p>
+          </div>
           <div id="flow-step-public-reply" className="scroll-mt-6 space-y-3">
             <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
               <span className="text-sm text-foreground">

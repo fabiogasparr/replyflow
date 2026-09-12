@@ -74,17 +74,52 @@ interface WebhookEntry {
   messaging?: Array<{
     sender?: { id?: string };
     recipient?: { id?: string };
-    postback?: { mid?: string; title?: string; payload?: string };
+    postback?: {
+      mid?: string;
+      title?: string;
+      payload?: string;
+      referral?: WebhookReferral;
+    };
     read?: { watermark?: number; seq?: number };
+    // ig.me link opened a thread (messaging_referral field).
+    referral?: WebhookReferral;
     message?: {
       mid?: string;
       text?: string;
       is_echo?: boolean;
       is_deleted?: boolean;
       is_unsupported?: boolean;
-      attachments?: Array<{ type?: string }>;
+      attachments?: Array<{ type?: string; payload?: { url?: string } }>;
+      // Set when the DM is a reply to one of the account's stories.
+      reply_to?: { story?: { id?: string; url?: string }; mid?: string };
+      referral?: WebhookReferral;
     };
   }>;
+}
+
+interface WebhookReferral {
+  ref?: string;
+  source?: string;
+  type?: string;
+  ad_id?: string;
+}
+
+/**
+ * Interactions other than a plain DM that can start a conversation: a reply
+ * to the account's story, a mention of the account in someone's story, or a
+ * thread opened through an ig.me link carrying a `ref` code.
+ */
+export type WebhookInteractionKind = "story_reply" | "story_mention" | "referral";
+
+export interface WebhookInteractionEvent {
+  kind: WebhookInteractionKind;
+  instagramAccountId: string;
+  /** Message id (or a synthetic id for referral-only events) used for dedupe. */
+  messageId: string;
+  messageText: string;
+  senderId: string;
+  storyId?: string;
+  referralCode?: string;
 }
 
 export interface WebhookMessageEvent {
@@ -121,7 +156,9 @@ export function parseCommentEvents(payload: WebhookPayload): WebhookCommentEvent
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
-      if (change.field !== "comments") continue;
+      // Live-video comments share the comment shape and the private-reply
+      // rules, so "any post" campaigns cover lives too.
+      if (change.field !== "comments" && change.field !== "live_comments") continue;
 
       const value = change.value;
       const commentId = value?.id ?? value?.comment_id;
@@ -227,6 +264,11 @@ export function parseMessageEvents(
       if (!text || !messageId || !senderId || !accountId) continue;
       // Ignore anything the connected account sent to itself.
       if (senderId === accountId) continue;
+      // Story replies and ig.me referrals are richer interactions handled by
+      // parseInteractionEvents, which still lets DM-keyword campaigns match.
+      if (message.reply_to?.story || message.referral?.ref || messaging.referral?.ref) {
+        continue;
+      }
 
       events.push({
         instagramAccountId: accountId,
@@ -265,6 +307,80 @@ export function parseReadEvents(payload: WebhookPayload): WebhookReadEvent[] {
         userId,
         watermark: messaging.read.watermark,
       });
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Parse story replies, story mentions and ig.me referrals. Echoes and the
+ * account's own actions are dropped exactly as in parseMessageEvents.
+ */
+export function parseInteractionEvents(
+  payload: WebhookPayload
+): WebhookInteractionEvent[] {
+  const events: WebhookInteractionEvent[] = [];
+
+  if (payload.object !== "instagram") return events;
+
+  for (const entry of payload.entry ?? []) {
+    for (const messaging of entry.messaging ?? []) {
+      const senderId = messaging.sender?.id;
+      const accountId = entry.id ?? messaging.recipient?.id;
+      if (!senderId || !accountId || senderId === accountId) continue;
+
+      const message = messaging.message;
+      if (message?.is_echo || message?.is_deleted || message?.is_unsupported) {
+        continue;
+      }
+
+      const referralCode =
+        messaging.referral?.ref?.trim() ||
+        message?.referral?.ref?.trim() ||
+        messaging.postback?.referral?.ref?.trim();
+      if (referralCode) {
+        const messageId =
+          message?.mid ??
+          messaging.postback?.mid ??
+          `referral_${accountId}_${senderId}_${entry.time ?? Date.now()}`;
+        events.push({
+          kind: "referral",
+          instagramAccountId: accountId,
+          messageId,
+          messageText: message?.text?.trim() ?? "",
+          senderId,
+          referralCode,
+        });
+        continue;
+      }
+
+      if (!message?.mid) continue;
+
+      if (message.reply_to?.story) {
+        events.push({
+          kind: "story_reply",
+          instagramAccountId: accountId,
+          messageId: message.mid,
+          messageText: message.text?.trim() ?? "",
+          senderId,
+          storyId: message.reply_to.story.id,
+        });
+        continue;
+      }
+
+      const mention = message.attachments?.find(
+        (attachment) => attachment.type === "story_mention"
+      );
+      if (mention) {
+        events.push({
+          kind: "story_mention",
+          instagramAccountId: accountId,
+          messageId: message.mid,
+          messageText: message.text?.trim() ?? "",
+          senderId,
+        });
+      }
     }
   }
 

@@ -8,6 +8,8 @@ import { buildTrackedUrl } from "@/lib/tracking/message";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import { buildReportUrl } from "@/lib/reports/share";
 import { deriveAutomationOperationalState } from "@/lib/automations/operational-state";
+import { syncAccountIceBreakers } from "@/lib/meta/ice-breakers";
+import { generateReferralCode } from "@/lib/automations/referral";
 import {
   canManageAutomations,
   getCurrentWorkspaceContext,
@@ -34,6 +36,9 @@ const createAutomationSchema = z
     keywords: z.array(z.string().min(1).max(50)).max(10).optional().default([]),
     matchAnyWord: z.boolean().optional().default(false),
     dmTriggerEnabled: z.boolean().optional().default(false),
+    storyTriggerEnabled: z.boolean().optional().default(false),
+    referralTriggerEnabled: z.boolean().optional().default(false),
+    iceBreakerQuestion: z.string().max(80).optional().nullable(),
     dmMessage: z.string().min(1).max(1000),
     // Extra wordings of the link DM, one picked per send (see lib/messaging).
     dmMessages: z.array(z.string().max(1000)).max(10).optional().default([]),
@@ -108,6 +113,9 @@ const updateAutomationSchema = z.object({
   keywords: z.array(z.string().min(1).max(50)).max(10).optional(),
   matchAnyWord: z.boolean().optional(),
   dmTriggerEnabled: z.boolean().optional(),
+  storyTriggerEnabled: z.boolean().optional(),
+  referralTriggerEnabled: z.boolean().optional(),
+  iceBreakerQuestion: z.string().max(80).optional().nullable(),
   dmMessage: z.string().min(1).max(1000).optional(),
   dmMessages: z.array(z.string().max(1000)).max(10).optional(),
   humanDelayMinSeconds: z.number().int().min(0).max(900).optional(),
@@ -416,6 +424,12 @@ export async function POST(request: NextRequest) {
       keywords: matchAnyWord ? [] : parsed.data.keywords,
       matchAnyWord,
       dmTriggerEnabled: parsed.data.dmTriggerEnabled,
+      storyTriggerEnabled: parsed.data.storyTriggerEnabled,
+      referralTriggerEnabled: parsed.data.referralTriggerEnabled,
+      // The ig.me code is minted once and kept for the campaign's lifetime so
+      // links already printed in a bio or an ad never break.
+      referralCode: parsed.data.referralTriggerEnabled ? generateReferralCode() : null,
+      iceBreakerQuestion: parsed.data.iceBreakerQuestion?.trim() || null,
       dmMessage: parsed.data.dmMessage,
       dmMessages: dmVariations,
       humanDelayMinSeconds: humanDelay.min,
@@ -468,6 +482,10 @@ export async function POST(request: NextRequest) {
       trackedLinks: true,
     },
   });
+
+  if (automation.iceBreakerQuestion) {
+    await syncAccountIceBreakers(instagramAccount.id);
+  }
 
   return NextResponse.json(
     { success: true, data: automation },
@@ -553,6 +571,16 @@ export async function PATCH(request: NextRequest) {
     automationData.postId = null;
     automationData.postUrl = null;
   }
+  if (automationData.iceBreakerQuestion !== undefined) {
+    automationData.iceBreakerQuestion =
+      automationData.iceBreakerQuestion?.trim().slice(0, 80) || null;
+  }
+  // Mint the ig.me code the first time the referral trigger is switched on;
+  // switching it off keeps the code so the link can be re-enabled unchanged.
+  const referralCodeUpdate =
+    automationData.referralTriggerEnabled === true && !existing.referralCode
+      ? { referralCode: generateReferralCode() }
+      : {};
   if (automationData.aiInstructions !== undefined) {
     automationData.aiInstructions = automationData.aiInstructions?.trim() || null;
   }
@@ -588,8 +616,15 @@ export async function PATCH(request: NextRequest) {
 
   const updated = await prisma.automation.update({
     where: { id: automationId, workspaceId },
-    data: automationData,
+    data: { ...automationData, ...referralCodeUpdate },
   });
+
+  if (
+    automationData.iceBreakerQuestion !== undefined ||
+    (automationData.isActive !== undefined && existing.iceBreakerQuestion)
+  ) {
+    await syncAccountIceBreakers(existing.instagramAccountId);
+  }
 
   // Update, create, or clear the campaign's primary tracked link when a
   // destination URL was supplied. `undefined` means "leave it alone".
@@ -699,6 +734,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   await prisma.automation.delete({ where: { id: automationId, workspaceId } });
+
+  if (existing.iceBreakerQuestion) {
+    await syncAccountIceBreakers(existing.instagramAccountId);
+  }
 
   return NextResponse.json({ success: true, data: { deleted: true } });
 }

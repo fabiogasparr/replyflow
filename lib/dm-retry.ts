@@ -138,7 +138,21 @@ export function buildDmRetryJob(log: DmRetryCandidate):
       },
     };
   }
-  if (log.triggerType === "MESSAGE" && log.sourceEventId) {
+  if (
+    (log.triggerType === "MESSAGE" ||
+      log.triggerType === "STORY" ||
+      log.triggerType === "REFERRAL" ||
+      log.triggerType === "ICE_BREAKER") &&
+    log.sourceEventId
+  ) {
+    const kind =
+      log.triggerType === "STORY"
+        ? "story_reply"
+        : log.triggerType === "REFERRAL"
+          ? "referral"
+          : log.triggerType === "ICE_BREAKER"
+            ? "ice_breaker"
+            : "dm";
     return {
       name: MESSAGE_JOB_NAME,
       data: {
@@ -149,6 +163,7 @@ export function buildDmRetryJob(log: DmRetryCandidate):
         senderId: log.commenterId,
         matchedKeyword: log.matchedKeyword,
         approvedByOperator: true,
+        ...(kind === "dm" ? {} : { kind }),
       },
     };
   }

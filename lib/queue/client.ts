@@ -68,14 +68,27 @@ export interface ProcessFollowUpJob {
   commenterName?: string | null;
 }
 
-// An inbound DM from a user. Campaigns with `dmTriggerEnabled` whose keywords
-// match the text reply to the sender.
+// How a conversation-side trigger reached us. "dm" is a plain inbound DM
+// (keyword campaigns), the rest are richer interactions parsed by
+// parseInteractionEvents plus the ice-breaker tap routed from a postback.
+export type MessageTriggerKind =
+  | "dm"
+  | "story_reply"
+  | "story_mention"
+  | "referral"
+  | "ice_breaker";
+
+// An inbound DM (or story reply / mention / ig.me referral / ice breaker) from
+// a user. Which campaigns are eligible depends on `kind`; keyword matching
+// applies to kinds that carry text.
 export interface ProcessMessageJob {
   automationId?: string;
   instagramAccountId: string;
   messageId: string;
   messageText: string;
   senderId: string;
+  kind?: MessageTriggerKind;
+  referralCode?: string;
   matchedKeyword?: string | null;
   humanDelayApplied?: boolean;
   approvedByOperator?: boolean;

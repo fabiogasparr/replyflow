@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/client";
 import { getDMQueue } from "@/lib/queue/client";
 import {
   parseCommentEvents,
+  parseInteractionEvents,
   parseMessageEvents,
   parsePostbackEvents,
   parseReadEvents,
@@ -121,6 +122,28 @@ export async function POST(request: NextRequest) {
     );
 
     for (const event of postbackEvents) {
+      // Ice-breaker taps carry `campaign:<automationId>` and start a campaign
+      // exactly like a keyword DM would, so they go through the message path.
+      if (event.payload.startsWith("campaign:")) {
+        const automationId = event.payload.slice("campaign:".length);
+        await queue.add(
+          MESSAGE_JOB_NAME,
+          {
+            automationId,
+            instagramAccountId: event.instagramAccountId,
+            messageId: event.mid ?? `icebreaker_${event.userId}_${Date.now()}`,
+            messageText: "",
+            senderId: event.userId,
+            kind: "ice_breaker",
+          },
+          {
+            jobId: `icebreaker_${event.instagramAccountId}_${event.userId}_${(
+              event.mid ?? automationId
+            ).replace(/:/g, "_")}`,
+          }
+        );
+        continue;
+      }
       await queue.add(
         POSTBACK_JOB_NAME,
         {
@@ -164,6 +187,42 @@ export async function POST(request: NextRequest) {
           // and stays injective — substituting invalid characters would let two
           // distinct mids collapse onto one job id, silently dropping a reply.
           jobId: `message_${event.instagramAccountId}_${Buffer.from(
+            event.messageId
+          ).toString("base64url")}`,
+        }
+      );
+
+      if (account) {
+        await prisma.webhookEvent.update({
+          where: { id: webhookEvent.id },
+          data: { workspaceId: account.workspaceId },
+        });
+      }
+    }
+
+    // Story replies, story mentions and ig.me referrals.
+    const interactionEvents = parseInteractionEvents(
+      payload as Parameters<typeof parseInteractionEvents>[0]
+    );
+
+    for (const event of interactionEvents) {
+      const account = await prisma.instagramAccount.findUnique({
+        where: { instagramId: event.instagramAccountId },
+        select: { workspaceId: true },
+      });
+
+      await queue.add(
+        MESSAGE_JOB_NAME,
+        {
+          instagramAccountId: event.instagramAccountId,
+          messageId: event.messageId,
+          messageText: event.messageText,
+          senderId: event.senderId,
+          kind: event.kind,
+          referralCode: event.referralCode,
+        },
+        {
+          jobId: `${event.kind}_${event.instagramAccountId}_${Buffer.from(
             event.messageId
           ).toString("base64url")}`,
         }

@@ -401,6 +401,16 @@ model Automation {
   // keywords above. Independent of the post trigger — a DM has no media, so
   // postId / matchAnyPost do not apply to it.
   dmTriggerEnabled        Boolean   @default(false)
+  // Also fire on replies to the account's stories (keyword match on the reply
+  // text) and on story mentions (no text to match — always fires).
+  storyTriggerEnabled     Boolean   @default(false)
+  // Fire when a thread is opened through an ig.me link carrying referralCode
+  // (https://ig.me/m/<username>?ref=<code>), e.g. from the bio or an ad.
+  referralTriggerEnabled  Boolean   @default(false)
+  referralCode            String?
+  // Shown as an "ice breaker" question when someone opens the DM with the
+  // account; tapping it fires this campaign. Max four per account (Meta).
+  iceBreakerQuestion      String?
   dmMessage               String
   // Optional variations of the link DM. One is picked at send time (never the
   // same one twice in a row for a campaign) so DMs do not look identical.
@@ -475,6 +485,7 @@ model Automation {
   @@index([postId])
   @@index([workspaceId, lastErrorAt])
   @@index([lastErrorAt])
+  @@unique([instagramAccountId, referralCode])
 }
 
 model DmLog {
@@ -736,6 +747,9 @@ enum DmTriggerType {
   COMMENT
   MESSAGE
   POSTBACK
+  STORY
+  REFERRAL
+  ICE_BREAKER
 }
 
 enum WebhookStatus {

@@ -48,6 +48,21 @@ import {
   monthlyDmLimitError,
 } from "../user-facing-copy";
 
+function interactionLabel(kind: string): string {
+  switch (kind) {
+    case "story_reply":
+      return "Resposta a um story";
+    case "story_mention":
+      return "Menção em um story";
+    case "referral":
+      return "Abriu a conversa por um link ig.me";
+    case "ice_breaker":
+      return "Tocou em uma pergunta inicial";
+    default:
+      return "";
+  }
+}
+
 /**
  * Reply to an inbound DM whose text matches a campaign's keywords.
  *
@@ -61,11 +76,39 @@ export async function processMessage(
 ): Promise<void> {
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
   const requeueAttempt = job.data.requeueAttempt ?? 0;
+  const kind = job.data.kind ?? "dm";
+  // Story mentions, referrals and ice breakers carry no keyword to match: the
+  // interaction itself is the intent, so every eligible campaign fires.
+  const matchesWithoutKeywords =
+    kind === "story_mention" || kind === "referral" || kind === "ice_breaker";
+  const triggerType =
+    kind === "story_reply" || kind === "story_mention"
+      ? ("STORY" as const)
+      : kind === "referral"
+        ? ("REFERRAL" as const)
+        : kind === "ice_breaker"
+          ? ("ICE_BREAKER" as const)
+          : ("MESSAGE" as const);
+
+  const eligibility = job.data.automationId
+    ? { id: job.data.automationId }
+    : kind === "dm"
+      ? { dmTriggerEnabled: true }
+      : kind === "story_reply"
+        ? { OR: [{ storyTriggerEnabled: true }, { dmTriggerEnabled: true }] }
+        : kind === "story_mention"
+          ? { storyTriggerEnabled: true }
+          : kind === "referral"
+            ? {
+                referralTriggerEnabled: true,
+                referralCode: job.data.referralCode ?? "__none__",
+              }
+            : // ice_breaker without automationId cannot be resolved
+              { id: "__none__" };
 
   const automations = await prisma.automation.findMany({
     where: {
-      ...(job.data.automationId ? { id: job.data.automationId } : {}),
-      dmTriggerEnabled: true,
+      ...eligibility,
       isActive: true,
       instagramAccount: { instagramId: instagramAccountId },
     },
@@ -101,7 +144,7 @@ export async function processMessage(
   for (const automation of automations) {
     const matchResult = job.data.automationId
       ? { matched: true, matchedKeyword: job.data.matchedKeyword ?? null }
-      : automation.matchAnyWord
+      : matchesWithoutKeywords || automation.matchAnyWord
         ? { matched: true, matchedKeyword: null }
         : matchKeywords(
             messageText,
@@ -162,10 +205,10 @@ export async function processMessage(
       automationId: automation.id,
       instagramAccountId: automation.instagramAccountId,
       commenterId: senderId,
-      commentText: messageText,
+      commentText: messageText || interactionLabel(kind),
       commentId: dedupeId,
       matchedKeyword: matchResult.matchedKeyword,
-      triggerType: "MESSAGE" as const,
+      triggerType,
       sourceEventId: messageId,
       source: "WEBHOOK",
     };

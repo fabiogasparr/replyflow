@@ -273,4 +273,53 @@ describe("inbound message queue handler", () => {
       expect.objectContaining({ delay: 5000 })
     );
   });
+
+  it("fires story-mention campaigns without any keyword", async () => {
+    mocks.automationFindMany.mockResolvedValue([
+      { ...configuredAutomation, dmTriggerEnabled: false, storyTriggerEnabled: true },
+    ]);
+    mocks.matchKeywords.mockReturnValue({ matched: false, matchedKeyword: null });
+
+    await processMessage(job({ kind: "story_mention", messageText: "", messageId: "mid_mention" }));
+
+    expect(mocks.automationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ storyTriggerEnabled: true }) })
+    );
+    expect(mocks.matchKeywords).not.toHaveBeenCalled();
+    expect(mocks.sendRevealDirectMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.dmLogUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          triggerType: "STORY",
+          commentText: "Menção em um story",
+        }),
+      })
+    );
+  });
+
+  it("matches story replies against keywords for story and DM campaigns alike", async () => {
+    mocks.matchKeywords.mockReturnValue({ matched: false, matchedKeyword: null });
+    await processMessage(job({ kind: "story_reply", messageText: "oi", messageId: "mid_s" }));
+    expect(mocks.automationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [{ storyTriggerEnabled: true }, { dmTriggerEnabled: true }],
+        }),
+      })
+    );
+    expect(mocks.sendRevealDirectMessage).not.toHaveBeenCalled();
+  });
+
+  it("routes ig.me referrals to the campaign owning the code", async () => {
+    await processMessage(job({ kind: "referral", referralCode: "guia26", messageText: "", messageId: "mid_r" }));
+    expect(mocks.automationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ referralTriggerEnabled: true, referralCode: "guia26" }),
+      })
+    );
+    expect(mocks.sendRevealDirectMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.dmLogUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ triggerType: "REFERRAL" }) })
+    );
+  });
 });

@@ -44,4 +44,6 @@ A renderização estática não substitui teste interativo em navegador. Antes d
 6. Com conta de teste aprovada para uso do aplicativo, executar comentário real, recebimento do webhook, processamento do worker e entrega da resposta no Instagram.
 7. Conferir acessos e análise necessários para contas externas no painel da Meta; não inferir aprovação pela presença de variáveis de ambiente.
 
-O endereço público de teste, a validação interativa e o teste real com a Meta permanecem pendentes enquanto a infraestrutura de homologação não estiver disponível. Ver também [implantação de homologação](STAGING_INSTAGRAM.md) e [análise do aplicativo](META_APP_REVIEW.md).
+Validação desta entrega: 552 testes em 73 arquivos, lint, typecheck e build de produção aprovados. A imagem Docker também foi construída e a homologação local iniciou com PostgreSQL, Redis, web, worker e agendador. `node scripts/test-staging.mjs` passou com dois usuários sintéticos: login por e-mail via Mailpit, criação automática de assinatura, página protegida do wizard, consulta autenticada e bloqueios de leitura/alteração entre espaços distintos.
+
+O endereço público de teste, a validação interativa e o teste real com a Meta permanecem pendentes. A homologação está somente em `http://localhost:3100`; veja a [revisão de dependências antes da publicação](SECURITY_DEPENDENCIES_2026_09.md). Ver também [implantação de homologação](STAGING_INSTAGRAM.md) e [análise do aplicativo](META_APP_REVIEW.md).

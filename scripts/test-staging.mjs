@@ -13,6 +13,7 @@ const health = await fetch(`${base.origin}/api/health`, { signal: AbortSignal.ti
 assert.equal(health.status, 200, 'Banco, Redis, fila e worker devem estar disponíveis.');
 const unauthenticated = await fetch(`${base.origin}/api/contact-fields`);
 assert.equal(unauthenticated.status, 401, 'Dados do CRM não podem ser públicos.');
+assert.equal((await fetch(`${base.origin}/api/instagram/onboarding`)).status, 401, 'Assistente exige autenticação.');
 
 function client() {
   const cookies = new Map();
@@ -59,6 +60,17 @@ async function login(email) {
 
 const first = await login('tester@replyflow.test');
 const second = await login('tenant2@replyflow.test');
+const firstOnboardingResponse = await first('/api/instagram/onboarding');
+assert.equal(firstOnboardingResponse.status, 200);
+assert.equal(firstOnboardingResponse.headers.get('cache-control'), 'private, no-store');
+const firstOnboarding = (await firstOnboardingResponse.json()).data;
+const secondOnboarding = (await (await second('/api/instagram/onboarding')).json()).data;
+assert.notEqual(firstOnboarding.workspace.id, secondOnboarding.workspace.id, 'Cada cliente tem seu próprio espaço.');
+assert.equal(firstOnboarding.canManage, true, 'Proprietário pode iniciar autorização.');
+assert.equal((await second(`/api/instagram/onboarding?workspaceId=${encodeURIComponent(firstOnboarding.workspace.id)}`)).status, 409, 'Retorno do wizard não pode selecionar outro tenant.');
+const wizardPage = await first('/settings/instagram');
+assert.equal(wizardPage.status, 200, 'Página protegida do assistente disponível.');
+assert.ok((await wizardPage.text()).includes('conexão guiada'), 'Página inclui o assistente.');
 const created = await (await first('/api/contact-fields', {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ name: `Teste de isolamento ${Date.now()}`, type: 'TEXT' }),
@@ -73,6 +85,8 @@ assert.equal(foreignWrite.status, 404, 'Segundo tenant não pode alterar campo a
 const connection = await first('/api/instagram/connect');
 if (!env.INSTAGRAM_APP_ID) {
   assert.ok(connection.headers.get('location')?.includes('instagram=misconfigured'), 'Conexão sem credenciais deve explicar a pendência.');
+  const wizardConnect = await first(`/api/instagram/connect?flow=wizard&workspaceId=${encodeURIComponent(firstOnboarding.workspace.id)}`);
+  assert.equal(new URL(wizardConnect.headers.get('location')).pathname, '/settings/instagram', 'Falha de configuração retorna ao wizard.');
 }
-console.log('✓ HTTPS/HTTP, saúde, login por e-mail, dois tenants, assinatura Free e isolamento real aprovados.');
+console.log('✓ HTTPS/HTTP, saúde, login por e-mail, dois tenants, assinatura Free, wizard e isolamento real aprovados.');
 console.log('Nenhuma mensagem foi enviada ao Instagram. E-mails capturados somente no Mailpit.');

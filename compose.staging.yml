@@ -2,7 +2,8 @@ name: replyflow-staging
 
 x-app: &app
   image: replyflow-staging:local
-  build: .
+  # Only migrate builds this shared image; simultaneous builds can race while tagging.
+  pull_policy: never
   env_file: .env.staging
   init: true
   restart: unless-stopped

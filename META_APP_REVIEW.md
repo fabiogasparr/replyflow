@@ -48,6 +48,12 @@ Reviewers want to see the permission produce a real result for a real user. This
 - It only sends a reply when someone comments on the connected account's own content.
 - Tokens are encrypted at rest with AES-256-GCM.
 - Users can disconnect Instagram from Settings.
+- Data deletion: the dashboard's "User data deletion" field points to the
+  callback `/api/meta/data-deletion`. Meta POSTs a `signed_request` when a
+  person removes the app; ReplyFlow verifies the HMAC with the app secret,
+  deletes that professional account's connection (automations, delivery
+  logs, contacts and conversations cascade) and returns
+  `{ url, confirmation_code }`. `/data-deletion?code=…` shows the status.
 - Per-account rate limiting and deduplication prevent spammy behavior.
 
 ## Business verification

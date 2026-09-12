@@ -65,7 +65,7 @@ Configuração obrigatória:
 | Campos do webhook | `comments`, `messages` (inclui postbacks e leitura, usados pelo worker) |
 | URL da política de privacidade | `https://replyflow.kz3solucoes.cloud/privacy` |
 | URL dos termos | `https://replyflow.kz3solucoes.cloud/terms` |
-| URL de exclusão de dados | `https://replyflow.kz3solucoes.cloud/data-deletion` |
+| Exclusão de dados do usuário | opção **URL de retorno de chamada** → `https://replyflow.kz3solucoes.cloud/api/meta/data-deletion` (a Meta envia um `signed_request`; o ReplyFlow remove a conexão e responde com o código de confirmação). As instruções para pessoas continuam em `https://replyflow.kz3solucoes.cloud/data-deletion`, que também mostra o status pelo código (`?code=RF-XXXXX-XXXXX`). |
 | Permissões | `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`, `instagram_business_manage_insights` |
 
 Segredos a copiar para o Coolify: **Instagram App ID** → `INSTAGRAM_APP_ID`;

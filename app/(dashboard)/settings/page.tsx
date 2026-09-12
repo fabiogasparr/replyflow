@@ -268,6 +268,11 @@ export default function SettingsPage() {
       <section className="panel rounded p-4 sm:p-6">
         <h2 className="mb-6 text-base font-semibold">Conexão com o Instagram</h2>
 
+        <a href="/settings/instagram" className="mb-6 block rounded-lg border border-accent/30 bg-accent/5 p-4 transition-colors hover:bg-accent/10">
+          <span className="text-sm font-semibold text-foreground">Assistente de conexão do Instagram →</span>
+          <span className="mt-1 block text-xs leading-5 text-muted">Prepare seu perfil, autorize o acesso e confira o que falta para testar a primeira automação. Também ajuda a reconectar contas existentes.</span>
+        </a>
+
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3 py-3 border-b border-border">
             <div>
@@ -316,12 +321,12 @@ export default function SettingsPage() {
                     @{account.username}
                   </p>
                   <p className="mt-1 text-xs text-muted">
-                    Conexão válida até{" "}
+                    Expiração prevista do acesso:{" "}
                     {account.tokenExpiresAt
                       ? new Date(account.tokenExpiresAt).toLocaleDateString("pt-BR")
                       : "data indisponível"}{" "}
                     · {account.webhookSubscribed
-                      ? "Notificações ativas"
+                      ? "Inscrição em notificações registrada"
                       : "Notificações pendentes"}
                   </p>
                 </div>
@@ -346,7 +351,7 @@ export default function SettingsPage() {
             </span>
           ) : (
             <a
-              href="/api/instagram/connect"
+              href="/settings/instagram"
               className="px-4 py-2 rounded text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
             >
               {accounts.length > 0 ? "Conectar outra conta" : "Conectar Instagram"}

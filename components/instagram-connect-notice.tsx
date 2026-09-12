@@ -11,17 +11,32 @@ const TONE_CLASSES: Record<Tone, string> = {
 };
 
 const MESSAGES: Record<string, { tone: Tone; title: string; detail: string }> = {
+  workspace_changed: {
+    tone: "warning",
+    title: "O espaço ativo mudou",
+    detail: "Confira o espaço selecionado e inicie novamente a autorização para conectar a conta ao cliente correto.",
+  },
+  misconfigured: {
+    tone: "warning",
+    title: "Conexão ainda em preparação",
+    detail: "A equipe ReplyFlow precisa concluir a configuração do aplicativo antes da autorização. Você não precisa criar um aplicativo Meta nem informar chaves técnicas.",
+  },
+  failed: {
+    tone: "error",
+    title: "Não foi possível concluir a conexão",
+    detail: "Tente novamente. Se o problema continuar, procure o administrador do ReplyFlow para conferir a integração. Nenhuma aprovação ou autorização foi confirmada por esta mensagem.",
+  },
   denied: {
     tone: "warning",
     title: "Conexão com o Instagram cancelada",
     detail:
-      "A solicitação de permissão foi recusada no Instagram. Tente novamente e aceite todas as permissões solicitadas.",
+      "A autorização não foi concluída. Você pode tentar novamente e revisar as permissões na tela oficial do Instagram.",
   },
   invalid: {
     tone: "error",
     title: "Conexão com o Instagram expirada",
     detail:
-      "O link de acesso estava ausente ou foi criado há mais de 10 minutos. Inicie uma nova tentativa.",
+      "Não foi possível validar esta tentativa. Ela pode ter expirado ou ter sido aberta em outro navegador. Inicie uma nova autorização.",
   },
   forbidden: {
     tone: "error",
@@ -54,59 +69,6 @@ export function InstagramConnectNotice() {
   const status = searchParams.get("instagram");
 
   if (!status) return null;
-
-  if (status === "misconfigured") {
-    const missing = (searchParams.get("missing") ?? "")
-      .split(",")
-      .filter(Boolean);
-
-    return (
-      <Notice tone="error" title="Aplicativo do Instagram não configurado">
-        <p>
-          Configure{" "}
-          {missing.length > 0
-            ? "estas variáveis de ambiente"
-            : "as variáveis de ambiente necessárias"}{" "}
-          e reinicie o servidor:
-        </p>
-        {missing.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {missing.map((name) => (
-              <li key={name} className="font-mono text-xs">
-                {name}
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="mt-2">
-          Consulte <span className="font-mono text-xs">docs/setup.md</span> para
-          obter cada valor. A variável{" "}
-          <span className="font-mono text-xs">ENCRYPTION_KEY</span> deve conter
-          64 caracteres hexadecimais.
-        </p>
-      </Notice>
-    );
-  }
-
-  if (status === "failed") {
-    const reason = searchParams.get("reason");
-
-    return (
-      <Notice tone="error" title="Falha ao conectar o Instagram">
-        <p>
-          O Instagram aceitou o acesso, mas a conexão não foi concluída. Isso
-          geralmente indica um endereço de redirecionamento diferente ou permissões
-          ausentes no aplicativo da Meta.
-        </p>
-        {reason && (
-          <p className="mt-2 font-mono text-xs break-words opacity-80">
-            <span className="font-sans font-semibold">Detalhes técnicos: </span>
-            {reason}
-          </p>
-        )}
-      </Notice>
-    );
-  }
 
   const known = MESSAGES[status];
   if (!known) return null;

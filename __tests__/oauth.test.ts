@@ -31,6 +31,15 @@ describe("OAuth state and token encryption", () => {
     expect(verifyOAuthState(`${state}tampered`)).toBeNull();
   });
 
+  it("signs the allowlisted wizard destination and rejects destination tampering", () => {
+    const state = createOAuthState("workspace_123", "user_123", "wizard");
+    expect(verifyOAuthState(state)?.returnTo).toBe("wizard");
+    const [payload, signature] = state.split(".");
+    const changed = JSON.parse(Buffer.from(payload, "base64url").toString());
+    changed.returnTo = "https://evil.example";
+    expect(verifyOAuthState(`${Buffer.from(JSON.stringify(changed)).toString("base64url")}.${signature}`)).toBeNull();
+  });
+
   it("binds each attempt to a user and a unique nonce", () => {
     const first = createOAuthState("workspace_123", "user_123");
     const second = createOAuthState("workspace_123", "user_123");

@@ -1,15 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { canManageInstagram, getCurrentWorkspaceContext } from "@/lib/workspace-access";
 import { getBaseUrl, getMissingInstagramOAuthEnv } from "@/lib/env";
 import { createOAuthState, getAuthorizationUrl, INSTAGRAM_STATE_COOKIE } from "@/lib/meta/oauth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const wizard = request.nextUrl.searchParams.get("flow") === "wizard";
+  const returnPath = wizard ? "/settings/instagram" : "/settings";
   const context = await getCurrentWorkspaceContext();
   if (!context) {
     return NextResponse.redirect(`${getBaseUrl()}/login`);
   }
   if (!canManageInstagram(context.role)) {
-    return NextResponse.redirect(`${getBaseUrl()}/settings?instagram=forbidden`);
+    return NextResponse.redirect(`${getBaseUrl()}${returnPath}?instagram=forbidden`);
+  }
+
+  const expectedWorkspace = request.nextUrl.searchParams.get("workspaceId");
+  if (expectedWorkspace && expectedWorkspace !== context.workspaceId) {
+    return NextResponse.redirect(`${getBaseUrl()}${returnPath}?instagram=workspace_changed`);
   }
 
   // getAuthorizationUrl and createOAuthState call requireEnv, which throws.
@@ -18,14 +25,12 @@ export async function GET() {
   const missingEnv = getMissingInstagramOAuthEnv();
   if (missingEnv.length > 0) {
     return NextResponse.redirect(
-      `${getBaseUrl()}/settings?instagram=misconfigured&missing=${encodeURIComponent(
-        missingEnv.join(",")
-      )}`
+      `${getBaseUrl()}${returnPath}?instagram=misconfigured`
     );
   }
 
   const redirectUri = `${getBaseUrl()}/api/instagram/callback`;
-  const state = createOAuthState(context.workspaceId, context.userId);
+  const state = createOAuthState(context.workspaceId, context.userId, wizard ? "wizard" : undefined);
 
   const response = NextResponse.redirect(getAuthorizationUrl(redirectUri, state));
   response.cookies.set(INSTAGRAM_STATE_COOKIE, state, {

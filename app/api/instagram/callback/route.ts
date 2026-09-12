@@ -27,7 +27,12 @@ export async function GET(request: NextRequest) {
     ? verifyOAuthState(rawState) : null;
   const baseUrl = getBaseUrl();
   function redirect(url: string) {
-    const response = NextResponse.redirect(url);
+    const destination = new URL(url);
+    if (state?.returnTo === "wizard" && ["/settings", "/dashboard"].includes(destination.pathname)) {
+      destination.pathname = "/settings/instagram";
+      destination.searchParams.set("workspaceId", state.workspaceId);
+    }
+    const response = NextResponse.redirect(destination);
     response.cookies.set(INSTAGRAM_STATE_COOKIE, "", {
       httpOnly: true, secure: baseUrl.startsWith("https://"), sameSite: "lax",
       path: "/api/instagram/callback", maxAge: 0,
@@ -113,7 +118,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await prisma.$transaction(async (transaction) => {
+    const accountId = await prisma.$transaction(async (transaction) => {
       const currentMembership = await transaction.workspaceMember.findUnique({
         where: {
           workspaceId_userId: {
@@ -206,9 +211,12 @@ export async function GET(request: NextRequest) {
           },
         }),
       });
+      return account.id;
     }, { isolationLevel: "Serializable" });
 
-    return redirect(`${baseUrl}/dashboard?connected=true`);
+    const result = new URL(`${baseUrl}/dashboard?connected=true`);
+    if (state.returnTo === "wizard") result.searchParams.set("accountId", accountId);
+    return redirect(result.toString());
   } catch (err) {
     if (err instanceof WorkspacePlanLimitError) {
       return redirect(`${baseUrl}/settings?instagram=plan_limit`);

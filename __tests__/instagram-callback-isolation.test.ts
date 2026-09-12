@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  verifyOAuthState: vi.fn(),
   canConnectInstagramAccount: vi.fn(),
   exchangeCodeForToken: vi.fn(),
   getLongLivedToken: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock("@/lib/instagram-accounts", () => ({
 }));
 vi.mock("@/lib/meta/oauth", () => ({
   INSTAGRAM_STATE_COOKIE: "replyflow-instagram-state",
-  verifyOAuthState: () => ({ workspaceId: "workspace_1", userId: "user_1" }),
+  verifyOAuthState: mocks.verifyOAuthState,
   exchangeCodeForToken: mocks.exchangeCodeForToken,
   encryptToken: () => "encrypted-token",
 }));
@@ -52,6 +53,7 @@ import { GET } from "@/app/api/instagram/callback/route";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.verifyOAuthState.mockReturnValue({ workspaceId: "workspace_1", userId: "user_1" });
   mocks.auth.mockResolvedValue({ user: { id: "user_1" } });
   mocks.prisma.workspaceMember.findFirst.mockResolvedValue({ role: "ADMIN" });
   mocks.canConnectInstagramAccount.mockResolvedValue({ allowed: true });
@@ -87,6 +89,26 @@ function callbackRequest() {
 }
 
 describe("Instagram callback workspace isolation", () => {
+  it("returns a wizard connection to its signed workspace and persisted account", async () => {
+    mocks.verifyOAuthState.mockReturnValue({ workspaceId: "workspace_1", userId: "user_1", returnTo: "wizard" });
+    mocks.transaction.instagramAccount.findUnique.mockResolvedValue(null);
+    mocks.transaction.instagramAccount.create.mockResolvedValue({ id: "account_new", username: "loja", webhookSubscribed: true });
+    const response = await GET(callbackRequest());
+    const destination = new URL(response.headers.get("location")!);
+    expect(destination.pathname).toBe("/settings/instagram");
+    expect(destination.searchParams.get("workspaceId")).toBe("workspace_1");
+    expect(destination.searchParams.get("accountId")).toBe("account_new");
+    expect(destination.searchParams.get("connected")).toBe("true");
+    expect(response.cookies.get("replyflow-instagram-state")?.value).toBe("");
+  });
+
+  it("returns cancellation to the wizard only with validated state", async () => {
+    mocks.verifyOAuthState.mockReturnValue({ workspaceId: "workspace_1", userId: "user_1", returnTo: "wizard" });
+    const response = await GET(new NextRequest("http://localhost:3000/api/instagram/callback?error=access_denied&state=state", { headers: { cookie: "replyflow-instagram-state=state" } }));
+    expect(response.headers.get("location")).toContain("/settings/instagram?instagram=denied&workspaceId=workspace_1");
+    expect(mocks.exchangeCodeForToken).not.toHaveBeenCalled();
+  });
+
   it("rejects callbacks without the initiating browser cookie", async () => {
     const response = await GET(new NextRequest("http://localhost:3000/api/instagram/callback?code=code&state=state"));
     expect(response.headers.get("location")).toContain("instagram=invalid");

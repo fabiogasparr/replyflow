@@ -55,6 +55,7 @@ const dashboardPageTitles: ReadonlyArray<[prefix: string, title: string]> = [
   ["/inbox", "Conversas"],
   ["/contacts", "Contatos"],
   ["/logs", "Histórico de envios"],
+  ["/settings/instagram", "Conectar Instagram"],
   ["/settings", "Configurações"],
   ["/diagnostics", "Diagnóstico"],
   ["/dashboard", "Visão geral"],

@@ -8,7 +8,8 @@ Web, worker e agendador usam a mesma imagem e as mesmas chaves de criptografia.
 
 ```sh
 node scripts/staging.mjs init
-node scripts/staging.mjs preflight && docker-compose --env-file .env.staging -f compose.staging.yml up -d --build
+node scripts/staging.mjs preflight && docker-compose --env-file .env.staging -f compose.staging.yml build migrate
+docker-compose --env-file .env.staging -f compose.staging.yml up -d --no-build
 node scripts/staging.mjs check
 ```
 
@@ -18,6 +19,8 @@ e se recusa a substituir um arquivo existente. Nenhum segredo é copiado para
 a imagem Docker ou versionado. As migrations executam antes da aplicação.
 O pré-teste exige ao menos 6 GiB livres para evitar esgotar o disco durante a
 construção; reserve mais espaço conforme o crescimento do banco e dos logs.
+O serviço `migrate` é o único responsável por construir a imagem compartilhada;
+web, worker e cron a reutilizam para evitar construções concorrentes da mesma tag.
 
 Aplicação local: `http://localhost:3100`. Captura dos e-mails de acesso:
 `http://localhost:8026`. Apenas `tester@replyflow.test` e

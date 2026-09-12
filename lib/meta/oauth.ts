@@ -25,6 +25,7 @@ interface OAuthStatePayload {
   userId: string;
   nonce: string;
   ts: number;
+  returnTo?: "wizard";
 }
 
 function base64UrlEncode(value: string): string {
@@ -41,9 +42,9 @@ function signState(payload: string): string {
     .digest("base64url");
 }
 
-export function createOAuthState(workspaceId: string, userId: string): string {
+export function createOAuthState(workspaceId: string, userId: string, returnTo?: "wizard"): string {
   const payload = base64UrlEncode(
-    JSON.stringify({ workspaceId, userId, nonce: randomBytes(32).toString("hex"), ts: Date.now() } satisfies OAuthStatePayload)
+    JSON.stringify({ workspaceId, userId, nonce: randomBytes(32).toString("hex"), ts: Date.now(), returnTo } satisfies OAuthStatePayload)
   );
   return `${payload}.${signState(payload)}`;
 }
@@ -70,6 +71,7 @@ export function verifyOAuthState(state: string | null): OAuthStatePayload | null
     if (!parsed || typeof parsed.workspaceId !== "string" || !parsed.workspaceId ||
         typeof parsed.userId !== "string" || !parsed.userId ||
         typeof parsed.nonce !== "string" || !/^[a-f0-9]{64}$/.test(parsed.nonce) ||
+        (parsed.returnTo !== undefined && parsed.returnTo !== "wizard") ||
         !Number.isFinite(parsed.ts) || parsed.ts > Date.now() ||
         Date.now() - parsed.ts > STATE_MAX_AGE_MS) {
       return null;

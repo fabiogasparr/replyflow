@@ -6,6 +6,7 @@ import {
   hasSpintax,
   listSpintaxExpansions,
   pickVariantIndex,
+  poolLooksIdentical,
 } from "@/lib/messaging/variation";
 
 const always = (value: number) => () => value;
@@ -65,6 +66,15 @@ describe("variation picking", () => {
       "E aí",
     ]);
     expect(buildVariantPool(null, undefined)).toEqual([]);
+  });
+
+  it("flags a pool that would always produce the same text", () => {
+    expect(poolLooksIdentical(["Enviei o link no seu direct!"])).toBe(true);
+    expect(poolLooksIdentical([" Enviei ", "", null, undefined])).toBe(true);
+    expect(poolLooksIdentical(["Enviei o link no seu {direct|inbox}!"])).toBe(false);
+    expect(poolLooksIdentical(["Enviei", "Mandei"])).toBe(false);
+    expect(poolLooksIdentical([])).toBe(false);
+    expect(poolLooksIdentical(["", "  "])).toBe(false);
   });
 });
 

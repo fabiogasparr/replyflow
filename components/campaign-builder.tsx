@@ -26,6 +26,7 @@ import {
   type FlowDefinitionV1,
 } from "@/lib/automations/flow-definition";
 import { readCache, writeCache } from "@/lib/client-cache";
+import { poolLooksIdentical } from "@/lib/messaging/variation";
 import {
   IMPORT_QUEUE_KEY,
   IMPORT_ACCOUNT_KEY,
@@ -261,6 +262,18 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         .filter(Boolean),
     [keywordText]
   );
+
+  // "Every reply will be the same" — one filled message, no spintax and no
+  // AI rewording. Surfaced as a warning so nobody ships a campaign that
+  // stamps identical text under every comment.
+  const publicReplyLooksIdentical = useMemo(() => {
+    if (!publicReplyEnabled || aiPublicReplyEnabled) return false;
+    return poolLooksIdentical(publicReplyMessages);
+  }, [publicReplyEnabled, aiPublicReplyEnabled, publicReplyMessages]);
+  const dmLooksIdentical = useMemo(() => {
+    if (aiDmEnabled) return false;
+    return poolLooksIdentical([dmMessage, ...dmVariations]);
+  }, [aiDmEnabled, dmMessage, dmVariations]);
 
   // Fetch the connected account's real avatar for the preview (cache-first so
   // it shows instantly on a return visit instead of a blank circle).
@@ -626,7 +639,17 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
     fetch("/api/ai/status", { cache: "no-store" })
       .then((r) => r.json())
       .then((payload) => {
-        if (!cancelled) setAiAvailable(Boolean(payload?.data?.configured));
+        if (cancelled) return;
+        const configured = Boolean(payload?.data?.configured);
+        setAiAvailable(configured);
+        // A brand-new campaign on an installation with AI starts with the
+        // personalised reply and DM switched on: identical replies under
+        // every comment are exactly what gets an account flagged, and the
+        // templates still act as the fallback when the model is unavailable.
+        if (configured && mode === "new") {
+          setAiPublicReplyEnabled(true);
+          setAiDmEnabled(true);
+        }
       })
       .catch(() => {
         if (!cancelled) setAiAvailable(false);
@@ -634,7 +657,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mode]);
 
   function aiContextPayload() {
     return {
@@ -1284,6 +1307,17 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               {aiNotice && aiBusy === null && (
                 <p className="text-xs text-muted">{aiNotice}</p>
               )}
+              {publicReplyLooksIdentical && (
+                <p
+                  className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
+                  role="status"
+                >
+                  Do jeito que está, a mesma resposta pública vai aparecer
+                  embaixo de todos os comentários. Adicione mais respostas, use{" "}
+                  {"{opções|alternativas}"} no texto
+                  {aiAvailable ? " ou ative a resposta personalizada com IA abaixo" : ""}.
+                </p>
+              )}
               <p className="text-xs text-muted">
                 Uma resposta é escolhida aleatoriamente (nunca a mesma duas
                 vezes seguidas) para que os comentários não pareçam idênticos.
@@ -1571,6 +1605,16 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                 <p className="text-xs text-muted">
                   Cada envio usa uma das variações (a mensagem acima é a
                   primeira), sem repetir a última usada.
+                </p>
+              )}
+              {dmLooksIdentical && (
+                <p
+                  className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
+                  role="status"
+                >
+                  Todas as pessoas vão receber exatamente a mesma DM. Adicione
+                  variações, use {"{opções|alternativas}"} no texto
+                  {aiAvailable ? " ou ative a DM personalizada com IA abaixo" : ""}.
                 </p>
               )}
             </div>
